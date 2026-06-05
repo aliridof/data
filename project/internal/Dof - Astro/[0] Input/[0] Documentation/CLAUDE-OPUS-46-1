@@ -1,0 +1,1216 @@
+# DOF·ASTRO — Dokumentasi Teknis Lengkap (Revisi)
+
+---
+
+## DAFTAR ISI
+
+```
+BAB 1  — Abstraksi & Filosofi Sistem
+BAB 2  — Entitas Sistem (15 Objek)
+BAB 3  — Katalog Aspek (6 + Custom)
+BAB 4  — Sistem ORB Manual
+BAB 5  — Pipeline Kalkulasi Sudut
+BAB 6  — Logika Matriks 15×15
+BAB 7  — Detektor Anomali Kubah
+BAB 8  — Arsitektur Data & Alur Sistem
+BAB 9  — Validasi & Test Cases
+```
+
+---
+
+## BAB 1: ABSTRAKSI & FILOSOFI SISTEM
+
+### 1.1 Definisi
+
+```
+DOF·ASTRO adalah sistem analisis astronomis kuantitatif
+yang mengukur hubungan geometris antar entitas langit
+menggunakan matematika vektor 3D dan Great-Circle Separation.
+
+PRINSIP UTAMA:
+  • Murni geometri — tidak ada interpretasi subjektif
+  • Berbasis posisi fisik pengamat (Toposentrik)
+  • Sudut diukur di ruang 3D, bukan bidang datar
+  • Tidak ada sistem skor atau bobot nilai
+  • Hanya mendeteksi dan melaporkan aspek yang ada
+```
+
+### 1.2 Apa yang Diukur
+
+```
+Sistem mengukur SUDUT PISAH (θ) antara dua entitas langit.
+
+θ adalah jarak busur terpendek antara dua titik
+di permukaan bola langit, diukur dalam derajat.
+
+Jika θ mendekati sudut aspek tertentu (dalam batas ORB),
+maka pasangan entitas tersebut dinyatakan membentuk aspek.
+
+TIDAK ADA:
+  ✗ Nilai bobot aspek
+  ✗ Skor global atau per-objek
+  ✗ Klasifikasi "baik/buruk"
+  ✗ Interpretasi makna
+
+ADA:
+  ✓ Deteksi aspek (ya/tidak)
+  ✓ Nama aspek yang terbentuk
+  ✓ Nilai θ aktual
+  ✓ Orb (deviasi dari aspek tepat)
+  ✓ Status anomali kubah
+```
+
+### 1.3 Perubahan dari Versi Sebelumnya
+
+```
+┌─────────────────────┬─────────────────────┬─────────────────────┐
+│ Komponen            │ Sebelum             │ Sesudah             │
+├─────────────────────┼─────────────────────┼─────────────────────┤
+│ Jumlah Aspek        │ 16 aspek            │ 6 aspek + custom    │
+│ Sistem Skor         │ Ada (GREEN+4, dll)  │ Dihapus total       │
+│ ORB                 │ Fixed ±1°           │ Manual (default/    │
+│                     │                     │ custom per-aspek)   │
+│ Detektor Anomali    │ Tidak ada           │ Baru: aspek &       │
+│                     │                     │ sudut identik       │
+│ Warna Sel Matrix    │ Per zona skor       │ Per jenis aspek     │
+│                     │ (GREEN/BLUE/dll)    │ (visual saja)       │
+└─────────────────────┴─────────────────────┴─────────────────────┘
+```
+
+---
+
+## BAB 2: ENTITAS SISTEM
+
+### 2.1 Taksonomi
+
+```
+ENTITAS DOF·ASTRO (15 Total)
+│
+├── PERSONA (4)
+│   ├── STATIC (2)
+│   │   ├── TZ — Terrestrial Zenith
+│   │   └── TN — Terrestrial Nadir
+│   └── DYNAMIC (2)
+│       ├── CZ — Celestial Zenith
+│       └── CN — Celestial Nadir
+│
+└── OBJECT (11)
+    ├── PLANET (10): SUN MON MER VEN MAR JUP SAT URA NEP PLU
+    └── FIXED STAR (1): SUI (Sirius / α Canis Majoris)
+```
+
+### 2.2 Definisi & Vektor Setiap Entitas
+
+```
+TZ — Terrestrial Zenith
+  Definisi : Titik di permukaan Bumi lokasi pengamat. DIAM.
+  Vektor   : v = [0, 0, +1]  (Alt = +90°)
+  Sub-point: Lokasi pengamat sendiri (φ, λ)
+  isAbove  : Selalu TRUE
+
+TN — Terrestrial Nadir
+  Definisi : Antipoda TZ di permukaan Bumi. DIAM.
+  Vektor   : v = [0, 0, -1]  (Alt = -90°)
+  Sub-point: (-φ, λ ± 180°)
+  isAbove  : Selalu FALSE
+
+CZ — Celestial Zenith
+  Definisi : Titik di bola langit tepat di atas pengamat.
+             BERGERAK mengikuti rotasi Bumi.
+  RA       : = LST pengamat
+  Dec      : = φ (latitude pengamat)
+  Vektor   : v = [0, 0, +1]  (identik TZ dalam ruang lokal)
+  isAbove  : Selalu TRUE
+
+CN — Celestial Nadir
+  Definisi : Antipoda CZ di bola langit. BERGERAK.
+  RA       : = LST + 180°
+  Dec      : = -φ
+  Vektor   : v = [0, 0, -1]  (identik TN dalam ruang lokal)
+  isAbove  : Selalu FALSE
+
+SUN s/d PLU — Planet
+  Sumber   : swe.calc_ut(JD, id, SEFLG_TOPOCTR)
+  Pipeline : Ekliptika → Ekuatorial → Horizontal → Vektor 3D
+  isAbove  : TRUE jika Alt ≥ 0°
+
+SUI — Sirius
+  Sumber   : swe.fixstar2_ut('Sirius', JD, 0)
+  Pipeline : Ekliptika → Ekuatorial → Horizontal → Vektor 3D
+  Fallback : RA=101.287°, Dec=-16.716° (J2000)
+  isAbove  : TRUE jika Alt ≥ 0°
+```
+
+### 2.3 Aturan Zona Entitas
+
+```
+ZENITH ZONE — Entitas yang berlaku:
+
+  isZenithSide(X):
+    X.type ∈ {TZ, CZ} → TRUE  (selalu masuk Zenith Zone)
+    X.type ∈ {TN, CN} → FALSE (dilarang di Zenith Zone)
+    X = Planet/SUI    → X.isAbove (TRUE jika di atas horizon)
+
+NADIR ZONE — Entitas yang berlaku:
+
+  isNadirSide(X):
+    X.type ∈ {TN, CN} → TRUE  (selalu masuk Nadir Zone)
+    X.type ∈ {TZ, CZ} → FALSE (dilarang di Nadir Zone)
+    X = Planet/SUI    → !X.isAbove (TRUE jika di bawah horizon)
+```
+
+---
+
+## BAB 3: KATALOG ASPEK
+
+### 3.1 Filosofi Penyederhanaan
+
+```
+Versi sebelumnya menggunakan 16 aspek yang mencakup
+pembagian lingkaran dari /2 hingga /12.
+
+Revisi ini menyederhanakan ke 6 aspek UTAMA yang
+secara geometri paling fundamental dan dapat
+diverifikasi secara langsung dan intuitif.
+
+Aspek-aspek ini dipilih berdasarkan:
+  • Kemurnian geometri (pembagian lingkaran paling dasar)
+  • Universalitas penggunaan dalam tradisi astronomi
+  • Kemudahan verifikasi visual dan temporal
+```
+
+### 3.2 Enam Aspek Utama
+
+```
+═══════════════════════════════════════════════════════════════════
+  #   NAMA          SUDUT    DERIVASI           GEOMETRI
+═══════════════════════════════════════════════════════════════════
+
+1   KONJUNGSI        0°      360° / ∞           Dua titik
+                                                 berhimpit
+                                                 di bola langit
+
+2   SEXTILE          60°     360° / 6           Titik ke-1
+    (Sekstil)                                    dari heksagon
+                                                 beraturan
+
+3   QUINTILE         72°     360° / 5           Titik ke-1
+    (Kuintil)                                    dari pentagon
+                                                 beraturan
+
+4   SQUARE           90°     360° / 4           Titik ke-1
+    (Kuadrat)                                    dari persegi
+                                                 beraturan
+
+5   TRINE            120°    360° / 3           Titik ke-1
+    (Trigon)                                     dari segitiga
+                                                 beraturan
+
+6   OPPOSITION       180°    360° / 2           Dua titik
+    (Oposisi)                                    berlawanan
+                                                 di bola langit
+
+═══════════════════════════════════════════════════════════════════
+```
+
+### 3.3 Jarak Minimum Antar Aspek
+
+```
+Distribusi 6 aspek di rentang 0° — 180°:
+
+  0°        60°   72°      90°          120°                  180°
+  │          │     │        │             │                     │
+  KNJ        SKS   KUI      KDR           TRG                   OPS
+
+Gap antar aspek terdekat:
+
+  KNJ → SKS : 60°   (gap besar, aman)
+  SKS → KUI : 12°   (dengan ORB 3° maks, masih aman: gap > 2×3°)
+  KUI → KDR : 18°   (aman)
+  KDR → TRG : 30°   (aman)
+  TRG → OPS : 60°   (gap besar, aman)
+
+Syarat keamanan: gap > 2 × ORB_maksimum
+  Gap minimum = 12° (antara Sekstil dan Kuintil)
+  ORB maksimum aman = 12° / 2 = 6°
+  
+  Jika pengguna set ORB > 6°, sistem memperingatkan
+  potensi konflik antara Sekstil dan Kuintil.
+```
+
+### 3.4 Aspek Custom — Spesifikasi
+
+```
+MEKANISME CUSTOM ASPECT:
+
+Pengguna dapat menambahkan aspek di luar 6 aspek utama.
+Setiap aspek custom memiliki parameter:
+
+  Parameter yang WAJIB diisi:
+  ┌─────────────────────────────────────────────────────┐
+  │  name  : string  — nama aspek (max 32 karakter)     │
+  │  angle : float   — sudut dalam derajat [0°, 180°]  │
+  │  orb   : float   — toleransi khusus aspek ini      │
+  └─────────────────────────────────────────────────────┘
+
+  Parameter OPSIONAL:
+  ┌─────────────────────────────────────────────────────┐
+  │  symbol : string — simbol unicode (default: ◇)      │
+  │  color  : string — warna hex sel matrix (default:   │
+  │                    #e8e8e8)                         │
+  │  note   : string — catatan/keterangan               │
+  └─────────────────────────────────────────────────────┘
+
+VALIDASI SAAT MENAMBAH ASPEK CUSTOM:
+  1. angle harus float, [0, 180]
+  2. name tidak boleh kosong
+  3. orb harus float positif > 0
+  4. Peringatan jika |angle - aspek_existing| < 2 × orb
+     (potensi konflik matching)
+
+PENYIMPANAN:
+  Aspek custom disimpan terpisah dari 6 aspek utama.
+  Pada saat matching, 6 aspek utama dicek duluan,
+  kemudian aspek custom dicek setelahnya.
+  Jika ada konflik (dua aspek cocok untuk θ yang sama),
+  yang dipilih adalah yang memiliki orb terkecil.
+
+CONTOH ASPEK CUSTOM YANG UMUM DITAMBAHKAN:
+  • Semi-sekstil : 30°
+  • Kuadrat semi : 45°
+  • Septil        : 51.43°
+  • Biseptil      : 102.86°
+  • Triseptil     : 154.29°
+```
+
+### 3.5 Prioritas Matching Aspek
+
+```
+URUTAN PENGECEKAN SAAT MATCHING:
+
+  1. Cek semua 6 aspek utama
+  2. Cek semua aspek custom yang aktif
+  3. Dari semua kandidat yang masuk ORB,
+     pilih yang memiliki orb terkecil
+
+  Pseudocode:
+  
+    best = null
+    best_orb = ORB_aktif   ← nilai inisialisasi = batas maksimal
+
+    for each aspek A in [6_utama + custom_aktif]:
+      deviation = |θ - A.angle|
+      if deviation ≤ A.orb AND deviation < best_orb:
+        best_orb = deviation
+        best = A
+
+    return best  ← null jika tidak ada yang cocok
+```
+
+---
+
+## BAB 4: SISTEM ORB MANUAL
+
+### 4.1 Definisi ORB
+
+```
+ORB adalah toleransi maksimal deviasi sudut aktual (θ)
+dari sudut aspek yang tepat (θ_aspek).
+
+Aspek dianggap aktif jika:
+  |θ - θ_aspek| ≤ ORB
+
+ORB dinyatakan dalam derajat.
+
+Hubungan ORB dengan waktu:
+  Kecepatan rotasi Bumi = 15.041° per jam
+  
+  Jendela waktu = ORB / 15.041 jam
+                = ORB × 3.992 menit
+                ≈ ORB × 4 menit
+
+  Contoh:
+    ORB 1° = ±4 menit
+    ORB 3° = ±12 menit
+    ORB 5° = ±20 menit
+```
+
+### 4.2 Mode Default — Single ORB
+
+```
+DESKRIPSI:
+  Satu nilai ORB berlaku untuk SEMUA aspek secara seragam.
+
+PARAMETER:
+  orb_default : float, derajat
+  Default awal : 1.0°
+  Range valid  : 0.1° hingga 10.0°
+  (di atas 10° dianggap terlalu longgar dan diperingatkan)
+
+CARA KERJA:
+  Untuk setiap pasangan (A, B):
+    θ = gcSep(v_A, v_B)
+    
+    Untuk setiap aspek X:
+      if |θ - X.angle| ≤ orb_default:
+        → aspek X aktif
+
+KAPAN DIGUNAKAN:
+  • Analisis umum tanpa preferensi khusus
+  • Perbandingan konsisten antar semua aspek
+  • Mode default saat pertama kali membuka sistem
+```
+
+### 4.3 Mode Custom — ORB Per-Aspek
+
+```
+DESKRIPSI:
+  Setiap aspek memiliki nilai ORB-nya sendiri.
+  ORB aspek custom ditetapkan saat menambahkan aspek.
+  ORB aspek utama dapat diubah secara individual.
+
+PARAMETER:
+  orb_konjungsi  : float (default: 2.0°)
+  orb_sekstil    : float (default: 1.0°)
+  orb_kuintil    : float (default: 1.0°)
+  orb_kuadrat    : float (default: 1.5°)
+  orb_trigon     : float (default: 1.5°)
+  orb_oposisi    : float (default: 2.0°)
+  orb_[custom_N] : float (ditetapkan pengguna)
+
+JUSTIFIKASI DEFAULT:
+  Konjungsi & Oposisi mendapat ORB lebih besar (2°)
+  karena keduanya merupakan aspek dengan dampak
+  geometri paling ekstrem (0° dan 180°).
+
+  Planet bergerak paling lambat saat konjungsi/oposisi
+  (efek retrograde/elongasi maksimum), sehingga jendela
+  waktu aspek secara fisik memang lebih lebar.
+
+CARA KERJA:
+  Untuk setiap pasangan (A, B):
+    θ = gcSep(v_A, v_B)
+    
+    Untuk setiap aspek X dengan orb_X:
+      if |θ - X.angle| ≤ orb_X:
+        → aspek X aktif
+```
+
+### 4.4 Tabel Referensi ORB dan Implikasinya
+
+```
+┌──────────┬───────────────┬────────────────────────────────────┐
+│ ORB (°)  │ Jendela Waktu │ Karakteristik                      │
+├──────────┼───────────────┼────────────────────────────────────┤
+│  0.25°   │  ± 1 menit    │ Sangat presisi, sedikit aspek      │
+│  0.50°   │  ± 2 menit    │ Ketat                              │
+│  1.00°   │  ± 4 menit    │ Standar ketat                      │
+│  2.00°   │  ± 8 menit    │ Standar umum                       │
+│  3.00°   │  ± 12 menit   │ Moderat                            │
+│  5.00°   │  ± 20 menit   │ Longgar                            │
+│  6.00°   │  ± 24 menit   │ BATAS AMAN untuk katalog 6 aspek   │
+│  7.00°+  │  ± 28 menit+  │ ⚠ Potensi konflik SKS↔KUI (gap 12°)│
+└──────────┴───────────────┴────────────────────────────────────┘
+```
+
+### 4.5 Validasi ORB
+
+```
+Sistem melakukan validasi setiap kali ORB diubah:
+
+  PERINGATAN KONFLIK ASPEK:
+    Untuk setiap pasangan aspek (X, Y) dimana X ≠ Y:
+      jika |X.angle - Y.angle| < (X.orb + Y.orb):
+        → Tampilkan peringatan:
+          "ORB Aspek [X] dan [Y] overlap pada θ=[overlap_zone]°.
+           Matching akan menggunakan orb terkecil."
+
+  CONTOH:
+    Sekstil (60°, ORB=5°) dan Kuintil (72°, ORB=5°)
+    Gap = 12°, total ORB = 10°
+    12° > 10° → aman (tidak overlap)
+
+    Sekstil (60°, ORB=7°) dan Kuintil (72°, ORB=7°)
+    Gap = 12°, total ORB = 14°
+    12° < 14° → OVERLAP di rentang 67°–65° → PERINGATKAN
+```
+
+---
+
+## BAB 5: PIPELINE KALKULASI SUDUT
+
+### 5.1 Diagram Alur Lengkap
+
+```
+INPUT: Waktu (UTC) + Lokasi (φ, λ, elev)
+│
+├── STEP 1: Hitung JD & LST
+│     JD   = julday(Y, M, D, H_decimal_utc)
+│     GMST = sidtime(JD)                   [jam]
+│     LST  = (GMST × 15 + λ) mod 360      [derajat]
+│
+├── STEP 2: Set toposentrik
+│     swe.set_topo(λ, φ, elev)
+│
+├── STEP 3: Hitung posisi tiap entitas
+│     │
+│     ├── TZ/CZ → v = [0, 0, +1]  (statis/konstan)
+│     ├── TN/CN → v = [0, 0, -1]  (statis/konstan)
+│     │
+│     ├── Planet → calc_ut(JD, id, 32768)
+│     │              → ekliptika (λ, β)
+│     │              → eclToEq(λ, β)   → (RA, Dec)
+│     │              → eqToHz(RA, Dec, LST, φ)  → (Az, Alt)
+│     │              → toVec(Az, Alt)  → [x, y, z]
+│     │
+│     └── Sirius → fixstar2_ut('Sirius', JD, 0)
+│                    → ekliptika (λ, β)
+│                    → eclToEq → eqToHz → toVec
+│
+├── STEP 4: Hitung θ semua pasangan
+│     Untuk (i,j) dimana i ≠ j:
+│       θ_ij = gcSep(v_i, v_j)
+│            = arccos(clamp(v_i · v_j, -1, +1)) × (180/π)
+│
+├── STEP 5: Filter zona
+│     j > i : Zenith Zone → cek isZenithSide(i) & isZenithSide(j)
+│     j < i : Nadir Zone  → cek isNadirSide(i) & isNadirSide(j)
+│
+├── STEP 6: Match aspek
+│     Untuk setiap pasangan aktif:
+│       → matchAspect(θ_ij, mode_orb)
+│       → aspek dengan orb terkecil (jika ada)
+│
+└── STEP 7: Deteksi anomali
+      → hitungAnomalyKubah(zenith_pairs, nadir_pairs)
+```
+
+### 5.2 Konversi Koordinat
+
+```
+A. EKLIPTIKA → EKUATORIAL:
+
+   Input  : λ (longitude ekliptika, °), β (latitude ekliptika, °)
+   Output : RA (radian), Dec (radian)
+
+   ε = 23.439291° = 0.40905 rad  (obliquitas J2000)
+
+   sin(Dec) = sin(β) × cos(ε) + cos(β) × sin(ε) × sin(λ)
+   Dec = arcsin(clamp(sin(Dec), -1, +1))
+
+   RA = atan2(
+     sin(λ) × cos(ε) - tan(β) × sin(ε),
+     cos(λ)
+   )
+   if RA < 0: RA += 2π
+
+
+B. EKUATORIAL → HORIZONTAL:
+
+   Input  : RA (rad), Dec (rad), LST (rad), φ (rad)
+   Output : Az (radian, 0=Utara CW), Alt (radian)
+
+   HA = LST - RA   (Hour Angle)
+
+   sin(Alt) = sin(φ) × sin(Dec) + cos(φ) × cos(Dec) × cos(HA)
+   Alt = arcsin(clamp(sin(Alt), -1, +1))
+
+   Az = atan2(-sin(HA), tan(Dec) × cos(φ) - sin(φ) × cos(HA))
+   if Az < 0: Az += 2π
+
+
+C. HORIZONTAL → VEKTOR 3D:
+
+   Input  : Az (radian), Alt (radian)
+   Output : v = [x, y, z]
+
+   Sumbu: +X = Utara, +Y = Timur, +Z = Zenith
+
+   x = cos(Alt) × cos(Az)
+   y = cos(Alt) × sin(Az)
+   z = sin(Alt)
+
+   Bukti unit: x² + y² + z² = cos²(Alt) + sin²(Alt) = 1 ✓
+```
+
+### 5.3 Great-Circle Separation
+
+```
+FORMULA INTI:
+
+   Input  : v₁ = [x₁, y₁, z₁]  (unit vector entitas A)
+            v₂ = [x₂, y₂, z₂]  (unit vector entitas B)
+   Output : θ dalam derajat
+
+   D     = x₁×x₂ + y₁×y₂ + z₁×z₂   (dot product)
+   D_c   = max(-1, min(+1, D))        (clamp anti-NaN)
+   θ     = arccos(D_c) × (180/π)
+
+   Rentang: θ ∈ [0°, 180°]
+   Simetri: θ(A,B) = θ(B,A)  (dot product komutatif)
+
+
+KASUS KHUSUS PERSONA:
+
+   θ(TZ, X) = arccos([0,0,1] · [x,y,z])
+             = arccos(z)
+             = arccos(sin(Alt_X))
+             = 90° - Alt_X
+
+   θ(TN, X) = arccos([0,0,-1] · [x,y,z])
+             = arccos(-z)
+             = arccos(-sin(Alt_X))
+             = 90° + Alt_X
+```
+
+---
+
+## BAB 6: LOGIKA MATRIKS 15×15
+
+### 6.1 Struktur Matriks
+
+```
+MATRIKS 15×15:
+  - 15 sel diagonal  = hitam (self vs self)
+  - 105 sel atas     = Zenith Zone (j > i)
+  - 105 sel bawah    = Nadir Zone  (j < i)
+  Total: 225 sel
+
+ISI SETIAP SEL:
+
+  SEL DIAGONAL:
+    → Hitam
+
+  SEL AKTIF (aspek cocok):
+    → Nama aspek + simbol
+    → Nilai θ aktual
+    → Nilai orb
+
+  SEL AKTIF (tidak ada aspek):
+    → Nilai θ dalam derajat (angka mentah)
+
+  SEL TIDAK AKTIF:
+    → Simbol × (entitas berbeda zona atau di luar horizon)
+```
+
+### 6.2 Decision Tree Aktivasi Sel
+
+```
+Untuk sel (i, j) dimana i ≠ j:
+
+  if j > i:  (Zenith Zone)
+    if NOT isZenSide(E_i): → [×]
+    if NOT isZenSide(E_j): → [×]
+    else:
+      θ = gcSep(v_i, v_j)
+      m = matchAspect(θ)
+      if m: → [nama_aspek | θ | orb]
+      else: → [θ°]
+
+  if j < i:  (Nadir Zone)
+    if NOT isNadSide(E_i): → [×]
+    if NOT isNadSide(E_j): → [×]
+    else:
+      θ = gcSep(v_i, v_j)
+      m = matchAspect(θ)
+      if m: → [nama_aspek | θ | orb]
+      else: → [θ°]
+```
+
+### 6.3 Tabel Aktivasi Lengkap
+
+```
+ZENITH ZONE — isZenSide per tipe entitas:
+
+  TZ  → TRUE  (poros Zenith statis)
+  CZ  → TRUE  (poros Zenith dinamis)
+  TN  → FALSE (dilarang di Zenith Zone)
+  CN  → FALSE (dilarang di Zenith Zone)
+  Planet/SUI di atas horizon (isAbove=T) → TRUE
+  Planet/SUI di bawah horizon (isAbove=F) → FALSE
+
+NADIR ZONE — isNadSide per tipe entitas:
+
+  TN  → TRUE  (poros Nadir statis)
+  CN  → TRUE  (poros Nadir dinamis)
+  TZ  → FALSE (dilarang di Nadir Zone)
+  CZ  → FALSE (dilarang di Nadir Zone)
+  Planet/SUI di bawah horizon (isAbove=F) → TRUE
+  Planet/SUI di atas horizon (isAbove=T)  → FALSE
+```
+
+### 6.4 Matriks 2 — Sudut Mentah
+
+```
+MATRIX 2 (θ Raw):
+  Menampilkan θ aktual untuk SEMUA pasangan,
+  tanpa filter zona, tanpa filter aspek.
+
+  Untuk setiap sel (i, j) dimana i ≠ j:
+    θ = gcSep(v_i, v_j)
+    tampilkan: θ dengan 2 desimal
+
+  Berguna untuk:
+    • Inspeksi sudut antar entitas lintas zona
+    • Menemukan pola yang tidak terlihat di Matrix 1
+    • Verifikasi manual perhitungan
+    • Studi "seberapa jauh dari aspek terdekat"
+
+  Warna sel (opsional):
+    Jika θ dalam ORB aspek tertentu → warna aspek itu
+    Jika tidak → putih/tanpa warna
+```
+
+---
+
+## BAB 7: DETEKTOR ANOMALI KUBAH
+
+### 7.1 Konsep Dasar
+
+```
+DEFINISI KUBAH:
+  Zenith Dome = Seluruh langit yang terlihat oleh pengamat
+                (semua entitas dengan isAbove = TRUE,
+                 termasuk TZ dan CZ)
+
+  Nadir Dome  = Seluruh langit di bawah pengamat
+                (semua entitas dengan isAbove = FALSE,
+                 termasuk TN dan CN)
+
+DEFINISI ANOMALI:
+  Kondisi konfigurasi geometris yang melampaui
+  ambang batas yang ditetapkan pengguna.
+
+  Sistem mendeteksi DUA JENIS anomali per kubah.
+```
+
+### 7.2 Anomali Tipe 1 — Kepadatan Aspek
+
+```
+DEFINISI:
+  Jumlah aspek aktif dalam satu kubah melampaui
+  nilai ambang batas N_Aspek.
+
+PARAMETER:
+  N_Aspek_default = 5
+  Dapat diubah pengguna: integer ≥ 1
+
+CARA HITUNG:
+
+  count_zen = 0
+  count_nad = 0
+
+  Untuk setiap pasangan aktif di Zenith Zone:
+    θ = gcSep(v_i, v_j)
+    m = matchAspect(θ)
+    if m ≠ null: count_zen++
+
+  Untuk setiap pasangan aktif di Nadir Zone:
+    θ = gcSep(v_i, v_j)
+    m = matchAspect(θ)
+    if m ≠ null: count_nad++
+
+  if count_zen ≥ N_Aspek:
+    → ANOMALI ASPEK — ZENITH DOME
+    → Detail: "N aspek aktif (ambang: M)"
+
+  if count_nad ≥ N_Aspek:
+    → ANOMALI ASPEK — NADIR DOME
+    → Detail: "N aspek aktif (ambang: M)"
+
+INTERPRETASI:
+  Banyak aspek aktif secara bersamaan
+  mengindikasikan konfigurasi geometris
+  yang padat/kompleks di kubah tersebut.
+  Bukan penilaian baik/buruk — hanya deteksi.
+```
+
+### 7.3 Anomali Tipe 2 — Sudut Identik
+
+```
+DEFINISI:
+  Jumlah pasangan dengan sudut separasi yang IDENTIK
+  (dalam toleransi ±0.1°) dalam satu kubah melampaui
+  nilai ambang batas N_Identik.
+
+PARAMETER:
+  N_Identik_default = 5
+  Toleransi identik  = ±0.1° (fixed, tidak dapat diubah)
+  N_Identik dapat diubah pengguna: integer ≥ 2
+
+CARA HITUNG:
+
+  Kumpulkan semua θ aktif di kubah:
+    θ_list = [θ_ij untuk semua pasangan aktif]
+
+  Buat frequency map:
+    theta_groups = {}
+    for θ in θ_list:
+      key = round(θ / 0.1) × 0.1   ← bulatkan ke 0.1°
+      theta_groups[key] = theta_groups.get(key, []) + [(i,j,θ)]
+
+  Hitung pasangan identik:
+    identical_groups = filter(theta_groups, len ≥ 2)
+    max_identical_count = max(len(group) for group in identical_groups)
+    total_identical_pairs = sum(len(group) for group in identical_groups)
+
+  TRIGGER ANOMALI jika:
+    total_identical_pairs ≥ N_Identik:
+      → ANOMALI SUDUT IDENTIK — DOME
+      → Detail: "N pasangan sudut identik"
+      → Daftar: θ yang berulang dan pasangan entitasnya
+
+INTERPRETASI:
+  Sudut identik mengindikasikan adanya "simpul sudut"
+  (angular node) dimana beberapa benda langit
+  secara bersamaan membentuk hubungan geometris
+  yang sama persis terhadap satu sama lain.
+  Ini adalah kondisi geometris yang langka.
+
+CONTOH ILUSTRASI:
+  Kubah Zenith memiliki 7 entitas aktif.
+  Ternyata:
+    θ(SUN, MON) = 60.05°
+    θ(SUN, MER) = 60.08°
+    θ(VEN, SAT) = 60.03°
+    θ(JUP, SUI) = 60.06°
+    θ(MAR, URA) = 60.09°
+
+  Semua ≈ 60° (dalam ±0.1°) → 5 pasangan identik
+  Jika N_Identik = 5 → ANOMALI TERPICU
+```
+
+### 7.4 Output Laporan Anomali
+
+```
+FORMAT LAPORAN ANOMALI:
+
+  ANOMALI TERDETEKSI
+  ══════════════════════════════════════════
+  Waktu    : [ISO timestamp]
+  Kubah    : ZENITH / NADIR
+  Lokasi   : [lat]°, [lon]°
+
+  Tipe 1 — KEPADATAN ASPEK:
+    Status  : AKTIF / TIDAK AKTIF
+    Jumlah  : N aspek aktif
+    Ambang  : M aspek
+    Daftar  :
+      → [Entitas A] — [aspek] — [Entitas B] (θ=X.XX°, orb=Y.YY°)
+      → ...
+
+  Tipe 2 — SUDUT IDENTIK:
+    Status  : AKTIF / TIDAK AKTIF
+    Jumlah  : N pasangan identik
+    Ambang  : M pasangan
+    Simpul  :
+      → θ ≈ X.X° : [Entitas A]—[Entitas B], [Entitas C]—[Entitas D], ...
+      → ...
+  ══════════════════════════════════════════
+```
+
+### 7.5 Penggabungan Kedua Anomali
+
+```
+KONDISI ANOMALI GANDA:
+
+Kedua anomali dapat aktif secara bersamaan
+dalam kubah yang sama atau berbeda.
+
+SKENARIO                           STATUS
+────────────────────────────────────────────────────────
+Aspek OK, Identik OK               Normal (tidak ada flag)
+Aspek ≥ N, Identik OK              ⚠ Anomali Tipe 1
+Aspek OK, Identik ≥ N              ⚠ Anomali Tipe 2
+Aspek ≥ N, Identik ≥ N             ⚠⚠ Anomali Ganda
+────────────────────────────────────────────────────────
+
+ANOMALI GANDA memiliki flag tersendiri dan
+ditampilkan dengan visual yang lebih menonjol
+di antarmuka pengguna.
+```
+
+---
+
+## BAB 8: ARSITEKTUR DATA & ALUR SISTEM
+
+### 8.1 Struktur Data Aspek
+
+```
+ASPEK UTAMA (immutable, tidak dapat dihapus):
+
+  AspekUtama = [
+    {
+      id     : 'konj',
+      name   : 'Konjungsi',
+      angle  : 0,
+      symbol : '☌',
+      custom : false
+    },
+    {
+      id     : 'seks',
+      name   : 'Sekstil',
+      angle  : 60,
+      symbol : '⚹',
+      custom : false
+    },
+    {
+      id     : 'kuin',
+      name   : 'Kuintil',
+      angle  : 72,
+      symbol : '⬠',
+      custom : false
+    },
+    {
+      id     : 'kuad',
+      name   : 'Kuadrat',
+      angle  : 90,
+      symbol : '□',
+      custom : false
+    },
+    {
+      id     : 'trig',
+      name   : 'Trigon',
+      angle  : 120,
+      symbol : '△',
+      custom : false
+    },
+    {
+      id     : 'opos',
+      name   : 'Oposisi',
+      angle  : 180,
+      symbol : '☍',
+      custom : false
+    }
+  ]
+
+
+ASPEK CUSTOM (mutable, dapat ditambah/hapus):
+
+  AspekCustom = [
+    {
+      id     : 'cust_0001',    ← auto-generated UUID
+      name   : string,
+      angle  : float,
+      symbol : string,
+      orb    : float,          ← orb khusus aspek ini
+      color  : string,         ← warna sel matrix
+      note   : string,
+      custom : true,
+      active : boolean         ← bisa dinonaktifkan sementara
+    },
+    ...
+  ]
+```
+
+### 8.2 Struktur Data Konfigurasi ORB
+
+```
+KONFIGURASI ORB:
+
+  OrbConfig = {
+    mode : 'default' | 'custom',
+
+    default_value : float,   ← digunakan jika mode = 'default'
+
+    custom_values : {         ← digunakan jika mode = 'custom'
+      'konj' : float,
+      'seks' : float,
+      'kuin' : float,
+      'kuad' : float,
+      'trig' : float,
+      'opos' : float,
+      'cust_0001' : float,   ← untuk setiap aspek custom
+      ...
+    }
+  }
+
+
+FUNGSI AMBIL ORB:
+
+  getOrb(aspek_id, config):
+    if config.mode === 'default':
+      return config.default_value
+    else:
+      return config.custom_values[aspek_id] ?? config.default_value
+```
+
+### 8.3 Struktur Data Konfigurasi Anomali
+
+```
+KONFIGURASI ANOMALI:
+
+  AnomalyConfig = {
+    enabled : boolean,        ← aktifkan/nonaktifkan deteksi
+
+    n_aspek : {
+      enabled   : boolean,
+      threshold : integer,    ← default: 5
+    },
+
+    n_identik : {
+      enabled   : boolean,
+      threshold : integer,    ← default: 5
+      tolerance : 0.1,        ← fixed, tidak dapat diubah
+    }
+  }
+```
+
+### 8.4 Struktur Data Output Per Frame
+
+```
+OUTPUT KALKULASI PER FRAME:
+
+  FrameResult = {
+    timestamp : ISO8601,
+    jd        : float,
+    gmst      : float,
+    lst_deg   : float,
+
+    entities : [
+      {
+        key     : string,
+        type    : string,
+        vec     : [x, y, z],
+        az      : float,
+        alt     : float,
+        isAbove : boolean,
+        subLat  : float,
+        subLon  : float,
+      },
+      ...  ← 15 entitas
+    ],
+
+    pairs : [
+      {
+        i       : integer,   ← index entitas A
+        j       : integer,   ← index entitas B
+        zone    : 'zenith' | 'nadir',
+        theta   : float,     ← sudut dalam derajat
+        active  : boolean,   ← apakah masuk zona
+        aspect  : {          ← null jika tidak ada aspek
+          id    : string,
+          name  : string,
+          angle : float,
+          orb   : float,     ← orb yang digunakan
+          deviation : float  ← |theta - angle|
+        } | null
+      },
+      ...  ← 210 pasangan
+    ],
+
+    anomaly : {
+      zenith : {
+        aspek_count    : integer,
+        aspek_flag     : boolean,
+        identik_count  : integer,
+        identik_flag   : boolean,
+        identik_groups : [...],
+      },
+      nadir : {
+        aspek_count    : integer,
+        aspek_flag     : boolean,
+        identik_count  : integer,
+        identik_flag   : boolean,
+        identik_groups : [...],
+      }
+    }
+  }
+```
+
+### 8.5 Alur Data Per Frame
+
+```
+FRAME N
+│
+├─ Baca konfigurasi saat ini
+│    OrbConfig, AnomalyConfig, AspekCustom
+│
+├─ Hitung posisi → FrameResult.entities[15]
+│
+├─ Hitung 210 pasangan → FrameResult.pairs[210]
+│    Setiap pasangan:
+│      1. Tentukan zona (zenith/nadir)
+│      2. Cek aktivasi zona
+│      3. Hitung θ (gcSep)
+│      4. Match aspek (matchAspect + getOrb)
+│      5. Simpan hasil
+│
+├─ Hitung anomali → FrameResult.anomaly
+│    Zenith:
+│      → filter pairs dengan zone='zenith' & active=true
+│      → hitung aspek_count (pairs dengan aspect≠null)
+│      → bandingkan dengan threshold
+│      → hitung identik_count (θ dalam ±0.1°)
+│      → bandingkan dengan threshold
+│    Nadir:
+│      → proses yang sama
+│
+└─ Render ke UI
+     → Matrix 1 (aspek)
+     → Matrix 2 (θ raw)
+     → Entity grid
+     → Map markers
+     → Telemetry
+     → Anomaly panel
+```
+
+---
+
+## BAB 9: VALIDASI & TEST CASES
+
+### 9.1 Test Cases Deterministik
+
+```
+TEST 1: Konjungsi TZ-Planet (Alt = +90°)
+
+  Setup: Planet X tepat di Zenith, Alt = 90°
+  v_TZ = [0, 0, 1]
+  v_X  = [cos90°·cos(Az), cos90°·sin(Az), sin90°] = [0, 0, 1]
+  
+  D = 0·0 + 0·0 + 1·1 = 1.0
+  θ = arccos(1.0) = 0° → Konjungsi ✓
+
+
+TEST 2: Kuadrat TZ-Planet (Alt = 0°, di Horizon)
+
+  v_TZ = [0, 0, 1]
+  v_X  = [cos0°·cos90°, cos0°·sin90°, sin0°] = [0, 1, 0]
+         (Az=90° sebagai contoh)
+  
+  D = 0·0 + 0·1 + 1·0 = 0
+  θ = arccos(0) = 90° → Kuadrat ✓
+
+
+TEST 3: Trigon TZ-Planet (Alt = -30°)
+
+  a = -30° = -0.5236 rad
+  v_TZ = [0, 0, 1]
+  
+  D = sin(-30°) = -0.5
+  θ = arccos(-0.5) = 120° → Trigon ✓
+
+
+TEST 4: Oposisi TZ-TN (selalu)
+
+  v_TZ = [0, 0, +1]
+  v_TN = [0, 0, -1]
+  
+  D = 0·0 + 0·0 + (+1)·(-1) = -1
+  θ = arccos(-1) = 180° → Oposisi ✓
+
+
+TEST 5: Konjungsi TZ-CZ (selalu)
+
+  v_TZ = [0, 0, +1]
+  v_CZ = [0, 0, +1]
+  
+  D = 1
+  θ = 0° → Konjungsi ✓
+
+
+TEST 6: Sekstil TZ-Planet (Alt = +30°)
+
+  θ = 90° - 30° = 60° → Sekstil ✓
+  Verifikasi:
+    v_TZ = [0,0,1], v_X = [cos30°·cos(Az), cos30°·sin(Az), sin30°]
+    D = sin(30°) = 0.5
+    θ = arccos(0.5) = 60° ✓
+
+
+TEST 7: Anomali Aspek — Zenith (N=3)
+
+  Setup: 3 aspek aktif di Zenith Zone, N_Aspek=3
+  count_zen = 3 ≥ N_Aspek = 3 → ANOMALI AKTIF ✓
+
+
+TEST 8: Anomali Identik — Nadir (N=2)
+
+  Setup:
+    θ(A,B) = 60.05°
+    θ(C,D) = 60.08°
+    θ(E,F) = 60.03°
+
+  Setelah bucketing (±0.1°):
+    group[60.0°] = [(A,B), (C,D), (E,F)] → 3 pasangan
+
+  N_Identik = 2, total_identical = 3 ≥ 2 → ANOMALI AKTIF ✓
+
+
+TEST 9: ORB Custom — Konflik Terdeteksi
+
+  Setup: Sekstil ORB=7°, Kuintil ORB=7°
+  Gap = |72° - 60°| = 12°
+  Total ORB = 7° + 7° = 14°
+  12° < 14° → KONFLIK TERDETEKSI → Peringatan UI ✓
+
+
+TEST 10: Matching Nearest-ORB
+
+  θ = 60.4°
+  Sekstil (60°): deviation = 0.4°, ORB_seks = 1.0° → KANDIDAT
+  Kuintil (72°): deviation = 11.6° > ORB_kuin → bukan kandidat
+  
+  HASIL: Sekstil, orb 0.4° ✓
+```
+
+### 9.2 Verifikasi Hubungan Alt ↔ Aspek TZ
+
+```
+Untuk verifikasi cepat menggunakan θ = 90° - Alt:
+
+┌──────────────┬──────────┬──────────────────┬──────────────────┐
+│ Alt Objek    │ θ dr TZ  │ Aspek Cocok      │ Status di Matrix │
+├──────────────┼──────────┼──────────────────┼──────────────────┤
+│ +90° Zenith  │    0°    │ Konjungsi        │ Zenith Zone ✓   │
+│ +30°         │   60°    │ Sekstil          │ Zenith Zone ✓   │
+│ +18°         │   72°    │ Kuintil          │ Zenith Zone ✓   │
+│  0° Horizon  │   90°    │ Kuadrat          │ Zenith Zone ✓   │
+│ -30°         │  120°    │ Trigon           │ Nadir Zone ✓    │
+│ -90° Nadir   │  180°    │ Oposisi          │ Nadir Zone ✓    │
+└──────────────┴──────────┴──────────────────┴──────────────────┘
+```
+
+---
+
+## RINGKASAN SISTEM
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║              DOF·ASTRO — RINGKASAN SISTEM REVISI             ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  ENTITAS     : 15 total (4 Persona + 10 Planet + 1 Bintang)  ║
+║                                                               ║
+║  ASPEK       : 6 utama (0°, 60°, 72°, 90°, 120°, 180°)      ║
+║                + custom tak terbatas                          ║
+║                                                               ║
+║  SKOR        : Tidak ada. Hanya deteksi aspek.               ║
+║                                                               ║
+║  ORB         : Manual — Default (satu nilai)                  ║
+║                atau Custom (per-aspek)                        ║
+║                                                               ║
+║  MATRIKS     : 15×15 = 225 sel                               ║
+║                105 sel Zenith Zone (j > i)                    ║
+║                105 sel Nadir Zone  (j < i)                    ║
+║                15 sel diagonal (hitam)                        ║
+║                                                               ║
+║  ANOMALI     : Per kubah (Zenith & Nadir)                    ║
+║                Tipe 1: Kepadatan aspek ≥ N_Aspek             ║
+║                Tipe 2: Sudut identik ≥ N_Identik (±0.1°)    ║
+║                                                               ║
+║  SUDUT       : Great-Circle via Dot Product                   ║
+║                θ = arccos(clamp(v₁·v₂, -1, +1)) × (180/π)  ║
+║                                                               ║
+║  ENGINE      : SwissEph WASM + Luxon + Leaflet               ║
+║                Toposentrik 3D — SEFLG_TOPOCTR                 ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+---
+
+[UPDATE DOKUMENTASI]
+
+1. Batas altitude horizon bisa custom, default adalah 3 derajat. 
+2. Rancang fitur matrix cross-dome, untuk menghitung sudut entitas antar kubah.
