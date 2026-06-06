@@ -1,0 +1,8 @@
+{
+  "name": "DOF - ASTRO - V1 [101]",
+  "description": "ASTROLOGY",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

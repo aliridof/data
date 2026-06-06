@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOF - ASTRO</title>
+    
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Geist Variable', 'sans-serif'],
+              mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen bg-white dark:bg-black p-4 md:p-8 font-sans text-black dark:text-white transition-colors">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <header class="mb-4 border-b-2 border-black dark:border-white pb-6 flex flex-col sm:flex-row justify-between sm:items-end gap-6 z-10 relative">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-extrabold text-black dark:text-white tracking-widest uppercase font-sans">DOF - ASTRO</h1>
+        <p class="text-[10px] text-neutral-500 dark:text-neutral-400 mt-2 uppercase tracking-[0.25em] font-sans font-bold">Astrology based on Astronomy</p>
+      </div>
+      <!-- Controls layer moved to header -->
+      <div class="bg-white dark:bg-black border-2 border-black dark:border-white p-2.5 flex items-center gap-2 select-none transition-all duration-300">
+          <span class="text-[9px] font-bold font-mono text-neutral-500 dark:text-neutral-400 uppercase tracking-widest select-none whitespace-nowrap">
+               MODE
+          </span>
+          <select id="MODE" class="bg-white dark:bg-black border border-black dark:border-white px-2.5 py-1 text-[10px] font-extrabold tracking-widest font-sans text-black dark:text-white uppercase focus:outline-none cursor-pointer rounded-none border-solid transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-900">
+              <option value="MAP" selected>MAP</option>
+              <option value="CHART">CHART</option>
+          </select>
+      </div>
+    </header>
+
+    <!-- Astro Map View -->
+    <div class="w-full h-[60vh] md:h-[550px] overflow-hidden border-2 border-black dark:border-white relative bg-[#f5f5f5] dark:bg-neutral-950 z-0 transition-all duration-350" id="map-container">
+        <div id="map" class="absolute inset-0 w-full h-full transition-opacity duration-350"></div>
+        
+        <!-- Split Vector View -->
+        <div id="map-split-container" class="absolute inset-0 w-full h-full hidden flex-row overflow-x-auto md:overflow-x-hidden snap-x snap-mandatory scroll-smooth no-scrollbar">
+            <!-- West Map Hemisphere -->
+            <div id="map-west" class="w-full md:w-1/2 h-full border-r border-black dark:border-white relative bg-[#020617] transition-opacity duration-350 flex-shrink-0 snap-center">
+                <div class="absolute top-2.5 right-2.5 z-[1000] bg-black/85 border border-white dark:border-white p-1.5 px-2 text-[9px] font-extrabold font-mono text-white select-none uppercase tracking-widest leading-none">
+                     WEST HEMISPHERE
+                </div>
+            </div>
+            <!-- East Map Hemisphere -->
+            <div id="map-east" class="w-full md:w-1/2 h-full relative bg-[#020617] transition-opacity duration-350 flex-shrink-0 snap-center">
+                <div class="absolute top-2.5 right-2.5 z-[1000] bg-black/85 border border-white dark:border-white p-1.5 px-2 text-[9px] font-extrabold font-mono text-white select-none uppercase tracking-widest leading-none">
+                     EAST HEMISPHERE
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Slide Indicators for CHART Mode -->
+        <div id="chart-mobile-dots" class="absolute bottom-4 left-1/2 -track-translate-x-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2 bg-white border border-black px-3 py-1.5 md:hidden hidden transition-all duration-300">
+            <button id="dot-west" class="w-2.5 h-2.5 bg-black transition-all duration-300 ring-2 ring-black ring-offset-2 ring-offset-white" aria-label="Nadir Hemisphere (West)"></button>
+            <button id="dot-east" class="w-2.5 h-2.5 bg-black/40 transition-all duration-300 hover:bg-black/70" aria-label="Zenith Hemisphere (East)"></button>
+        </div>
+        
+
+
+        <div class="absolute inset-0 pointer-events-none ring-1 ring-inset ring-black/10 dark:ring-white/10 z-[9999]"></div>
+    </div>
+
+    <!-- Simulation/Time Banner -->
+    <div id="simulation-banner" class="transition-all duration-300"></div>
+
+
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6" id="astronomy-grid">
+      
+      <!-- Right Column: Context specific content (Spans Full Width now) -->
+      <div class="lg:col-span-3 space-y-6 w-full">
+        
+
+        <!-- Astronomy Tab Data -->
+        <div id="astronomy-data-container" class="space-y-6">
+            <!-- DATA - STATIC - PERSONA - TERRESTRIAL -->
+            <div class="border border-black dark:border-white bg-white dark:bg-black overflow-hidden">
+              <div class="p-6" id="data-static-persona-terrestrial">
+                  <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400 mb-4 font-mono">DATA - STATIC - PERSONA - TERRESTRIAL</h2>
+                  <div id="terrestrial-list" class="grid grid-cols-1 gap-3.5">
+                      <!-- Populated dynamically via ui.js -->
+                  </div>
+              </div>
+            </div>
+
+            <!-- DATA - DYNAMIC - PERSONA - CELESTIAL -->
+            <div class="border border-black dark:border-white bg-white dark:bg-black overflow-hidden">
+              <div class="p-6" id="data-dynamic-persona-celestial">
+                  <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400 mb-4 font-mono">DATA - DYNAMIC - PERSONA - CELESTIAL</h2>
+                  <div id="celestial-list" class="grid grid-cols-1 gap-3.5">
+                      <!-- Populated dynamically via ui.js -->
+                  </div>
+              </div>
+            </div>
+
+            <!-- DATA - DYNAMIC - OBJECT -->
+            <div class="border border-black dark:border-white bg-white dark:bg-black overflow-hidden flex flex-col">
+              <div class="p-6" id="data-dynamic-object">
+                  <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400 mb-4 font-mono">DATA - DYNAMIC - OBJECT</h2>
+                  <div id="bodies-list" class="flex flex-col gap-2">
+                      <!-- Populated by ui.js -->
+                  </div>
+              </div>
+            </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Persona Modal -->
+  <div id="persona-modal" class="fixed inset-0 z-50 bg-slate-900/40 hidden flex items-center justify-center backdrop-blur-sm">
+      <!-- Modal Content (Filled by ui.js) -->
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Luxon JS -->
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  
+  <!-- Main Application Entry (Classic Scripts) -->
+  <script src="js/store.js"></script>
+  <script src="js/entity.js"></script>
+  <script src="js/astro.js"></script>
+  <script src="js/personaStats.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
