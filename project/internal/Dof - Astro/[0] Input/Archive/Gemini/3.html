@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronav Matrix - Minimalist Light Matrix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Helvetica+Neue,Helvetica,Arial,sans-serif&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Nike / Adidas Minimalist Light Palette */
+            --bg-main: #ffffff;
+            --bg-surface: #f5f5f5;
+            --bg-border: #e5e5e5;
+            --text-primary: #000000;
+            --text-secondary: #707072;
+            --accent-dark: #111111;
+            
+            /* Clean Minimalist Planet Colors */
+            --color-sun: #ffb300;
+            --color-moon: #000000;
+            --color-mercury: #424242;
+            --color-venus: #e0a6b1;
+            --color-mars: #fa541c;
+            --color-jupiter: #d4a373;
+            --color-saturn: #b5a46d;
+            --color-uranus: #73c2fb;
+            --color-neptune: #204060;
+            --color-pluto: #8e8e93;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 24px;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto 40px auto;
+            border-bottom: 2px solid var(--text-primary);
+            padding-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        @media (min-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr 380px;
+                align-items: start;
+            }
+        }
+
+        .visual-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .canvas-row-split {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 32px;
+            justify-content: center;
+            position: relative;
+        }
+
+        .canvas-card-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            flex: 1;
+            min-width: 360px;
+        }
+
+        .canvas-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            border-left: 3px solid var(--text-primary);
+            padding-left: 8px;
+        }
+
+        canvas {
+            display: block;
+            background-color: var(--bg-main);
+            border: 1px solid var(--text-primary);
+            width: 100%;
+            max-width: 440px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+        }
+
+        .aspect-table-container {
+            border-top: 2px solid var(--text-primary);
+            padding-top: 16px;
+            width: 100%;
+        }
+
+        .aspect-table-title {
+            font-size: 0.85rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+
+        th {
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--text-primary);
+            padding: 12px 8px;
+            color: var(--text-primary);
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--bg-border);
+            font-weight: 500;
+        }
+
+        tr:hover td {
+            background-color: var(--bg-surface);
+        }
+
+        .aspect-badge {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            border: 1px solid var(--text-primary);
+            padding: 2px 6px;
+            display: inline-block;
+        }
+
+        #loading {
+            position: absolute;
+            background-color: var(--text-primary);
+            color: var(--bg-main);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 12px 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 10;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .md-card {
+            border-top: 1px solid var(--text-primary);
+            padding-top: 16px;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 0 0 16px 0;
+        }
+
+        .clock-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .time-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--bg-border);
+            padding: 8px 0;
+            font-size: 0.9rem;
+        }
+
+        .time-box span {
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .layer-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bg-border);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .layer-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 16px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--bg-border); transition: .15s; cursor: pointer;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 10px; width: 10px; left: 3px; bottom: 3px;
+            background-color: var(--text-primary); transition: .15s;
+        }
+        input:checked + .slider { background-color: var(--text-primary); }
+        input:checked + .slider:before { transform: translateX(16px); background-color: var(--bg-main); }
+
+        .planet-monitor {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            background-color: var(--bg-border);
+            max-height: 440px;
+            overflow-y: auto;
+        }
+
+        .p-stat {
+            background-color: var(--bg-main);
+            padding: 14px 0;
+            display: grid;
+            grid-template-columns: 24px 80px 1fr auto;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--bg-border);
+        }
+
+        .p-icon-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            justify-self: center;
+        }
+
+        .p-name-tag {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: -0.2px;
+        }
+
+        .p-coords-tag {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .maps-btn {
+            background-color: transparent;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 4px 12px;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--text-primary);
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .maps-btn:hover {
+            background-color: var(--text-primary);
+            color: var(--bg-main);
+        }
+    </style>
+
+    <script type="module">
+        import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+        window.swe = new SwissEph();
+        await window.swe.initSwissEph();
+        document.getElementById('loading').style.display = 'none';
+        startRealtimeLoop();
+    </script>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Astronav Matrix</h1>
+            <div class="subtitle" style="margin-top: 4px;">True Horizon Project / Jakarta, ID</div>
+        </div>
+        <div class="subtitle" id="liveLabel">System Live</div>
+    </header>
+
+    <div class="main-container">
+        <div class="visual-panel">
+            <div class="canvas-row-split">
+                <div id="loading">Syncing SwissEph WASM...</div>
+                
+                <div class="canvas-card-wrapper">
+                    <div class="canvas-label">Kubah Zenith (Atas Langit)</div>
+                    <canvas id="zenithCanvas" width="440" height="440"></canvas>
+                </div>
+                
+                <div class="canvas-card-wrapper">
+                    <div class="canvas-label">Kubah Nadir (Bawah Bumi)</div>
+                    <canvas id="nadirCanvas" width="440" height="440"></canvas>
+                </div>
+            </div>
+
+            <div class="aspect-table-container">
+                <div class="aspect-table-title">Matriks Aspek Kompas Spasial (Bumi Azimut Orb Max 6°)</div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sub-Planet Pimpinan</th>
+                                <th>Aspek Horizontal</th>
+                                <th>Sub-Planet Relasi</th>
+                                <th>Sudut Deviasi Kompas</th>
+                                <th>Selisih Jarak (Orb)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aspectTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-secondary); font-family: 'Roboto Mono';">Calculating Azimuthal Alignment...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="md-card">
+                <div class="card-title">Kontrol Lapisan</div>
+                <div class="layer-list">
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 6: Latar Zodiak Astronomis (IAU)</div>
+                        <label class="switch"><input type="checkbox" id="layer6" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 4: Sektor Rendah (0° s/d ±30°) & Sirius</div>
+                        <label class="switch"><input type="checkbox" id="layer4" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 3: Sektor Menengah (±30° s/d ±60°)</div>
+                        <label class="switch"><input type="checkbox" id="layer3" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 2: Sektor Tinggi (±60° s/d ±90°)</div>
+                        <label class="switch"><input type="checkbox" id="layer2" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 1: Penanda Poros Titik Kutub Inti</div>
+                        <label class="switch"><input type="checkbox" id="layer1" checked><span class="slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="card-title">Chrono Time</div>
+                <div class="clock-grid">
+                    <div class="time-box"><span>UTC Chrono</span><div id="utcClock">-</div></div>
+                    <div class="time-box"><span>Julian Period</span><div id="jdClock">-</div></div>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="card-title">Telemetri Realtime Kompas</div>
+                <div id="monitorGrid" class="planet-monitor"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const zCanvas = document.getElementById('zenithCanvas');
+        const nCanvas = document.getElementById('nadirCanvas');
+        const zCtx = zCanvas.getContext('2d');
+        const nCtx = nCanvas.getContext('2d');
+        
+        const cx = 440 / 2;
+        const cy = 440 / 2;
+
+        const r6 = 195; 
+        const r4 = 160; 
+        const r3 = 125; 
+        const r2 = 90;  
+        const r1 = 55;  
+
+        const geoLat = -6.2088;
+        const geoLon = 106.8456;
+
+        const planetsConfig = [
+            { id: 0, name: 'Sun', symbol: '☉', color: 'var(--color-sun)' },
+            { id: 1, name: 'Moon', symbol: '☽', color: 'var(--color-moon)' },
+            { id: 2, name: 'Mercury', symbol: '☿', color: 'var(--color-mercury)' },
+            { id: 3, name: 'Venus', symbol: '♀', color: 'var(--color-venus)' },
+            { id: 4, name: 'Mars', symbol: '♂', color: 'var(--color-mars)' },
+            { id: 5, name: 'Jupiter', symbol: '♃', color: 'var(--color-jupiter)' },
+            { id: 6, name: 'Saturn', symbol: '♄', color: 'var(--color-saturn)' },
+            { id: 7, name: 'Uranus', symbol: '♅', color: 'var(--color-uranus)' },
+            { id: 8, name: 'Neptune', symbol: '♆', color: 'var(--color-neptune)' },
+            { id: 9, name: 'Pluto', symbol: '♇', color: 'var(--color-pluto)' }
+        ];
+
+        const majorAspects = [
+            { name: 'Conjunction', angle: 0, symbol: '☌' },
+            { name: 'Sextile', angle: 60, symbol: '⚹' },
+            { name: 'Square', angle: 90, symbol: '□' },
+            { name: 'Trine', angle: 120, symbol: '△' },
+            { name: 'Opposition', angle: 180, symbol: '☍' }
+        ];
+
+        const iauZodiacs = [
+            { name: "ARI", days: 25 }, { name: "TAU", days: 37 }, { name: "GEM", days: 31 },
+            { name: "CAN", days: 20 }, { name: "LEO", days: 37 }, { name: "VIR", days: 45 },
+            { name: "LIB", days: 23 }, { name: "SCO", days: 7 },  { name: "OPH", days: 18 }, 
+            { name: "SGR", days: 32 }, { name: "CAP", days: 28 }, { name: "AQR", days: 24 },
+            { name: "PSC", days: 38 }
+        ];
+
+        let planetsCalculated = [];
+        const siriusAzRad = (90 * Math.PI) / 180; 
+
+        function getZenithCoords(radius, angle) {
+            return {
+                x: cx + radius * Math.sin(angle),
+                y: cy - radius * Math.cos(angle)
+            };
+        }
+
+        function getNadirCoords(radius, angle) {
+            return {
+                x: cx - radius * Math.sin(angle), 
+                y: cy - radius * Math.cos(angle)
+            };
+        }
+
+        function startRealtimeLoop() {
+            function frame() {
+                if (window.swe) {
+                    const now = new Date();
+                    document.getElementById('utcClock').innerText = now.toUTCString().substring(17, 25);
+
+                    const jd = window.swe.julday(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate(), now.getUTCHours() + (now.getUTCMinutes() / 60) + (now.getUTCSeconds() / 3600));
+                    document.getElementById('jdClock').innerText = jd.toFixed(5);
+
+                    const gmstHour = window.swe.sidtime(jd); 
+                    const lstRad = ((gmstHour * 15 + geoLon) * Math.PI) / 180;
+
+                    planetsCalculated = planetsConfig.map(p => {
+                        const res = window.swe.calc_ut(jd, p.id, 2); 
+                        const lonRad = (res[0] * Math.PI) / 180;
+                        const latRad = (res[1] * Math.PI) / 180;
+
+                        const eps = 23.439291 * Math.PI / 180; 
+                        const ra = Math.atan2(Math.sin(lonRad) * Math.cos(eps) - Math.tan(latRad) * Math.sin(eps), Math.cos(lonRad));
+                        const dec = Math.asin(Math.sin(latRad) * Math.cos(eps) + Math.cos(latRad) * Math.sin(eps) * Math.sin(lonRad));
+                        
+                        const ha = lstRad - ra;
+                        const latRadGeo = (geoLat * Math.PI) / 180;
+
+                        const alt = Math.asin(Math.sin(latRadGeo) * Math.sin(dec) + Math.cos(latRadGeo) * Math.cos(dec) * Math.cos(ha));
+                        let az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(latRadGeo) - Math.sin(latRadGeo) * Math.cos(ha));
+                        if (az < 0) az += 2 * Math.PI;
+
+                        const altDeg = (alt * 180) / Math.PI;
+                        const azDeg = (az * 180) / Math.PI;
+
+                        const earthLat = (dec * 180) / Math.PI;
+                        let earthLon = geoLon - (ha * 180 / Math.PI);
+                        while (earthLon > 180) earthLon -= 360;
+                        while (earthLon < -180) earthLon += 360;
+
+                        let zRadius = r4 - ((altDeg / 90) * (r4 - r1));
+                        let nRadius = r4 - ((Math.abs(altDeg) / 90) * (r4 - r1));
+
+                        return {
+                            ...p, az: azDeg, alt: altDeg, azRad: az,
+                            zRadius: zRadius, nRadius: nRadius,
+                            earthLat: earthLat, earthLon: earthLon,
+                            isZenith: altDeg >= 0
+                        };
+                    });
+
+                    // PANGGIL KALKULASI ASPEK KOMPAS HORIZONTAL (AZIMUT)
+                    calculateAndRenderAzimuthAspects();
+
+                    const monitorGrid = document.getElementById('monitorGrid');
+                    monitorGrid.innerHTML = planetsCalculated.map(p => {
+                        const mapUrl = `http://googleusercontent.com/maps.google.com/maps?q=${p.earthLat.toFixed(6)},${p.earthLon.toFixed(6)}`;
+                        return `
+                            <div class="p-stat" style="border-left-color: ${p.isZenith ? '#000000' : '#d0d0d0'}">
+                                <div class="p-icon-dot" style="background-color: ${p.color}"></div>
+                                <div class="p-name-tag">${p.name}</div>
+                                <div class="p-coords-tag">
+                                    AZ:${p.az.toFixed(1)}° ALT:${p.alt.toFixed(1)}°<br>
+                                    GEO:${p.earthLat.toFixed(2)}°, ${p.earthLon.toFixed(2)}°
+                                </div>
+                                <a href="${mapUrl}" target="_blank" class="maps-btn">MAP</a>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                renderDualLayout();
+                requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+        }
+
+        // PERBAIKAN LOGIKA: Menghitung aspek dari perbedaan sudut Azimut Sub-Planet kompas horizontal pengamat
+        function calculateAndRenderAzimuthAspects() {
+            const tableBody = document.getElementById('aspectTableBody');
+            let aspectRowsHTML = '';
+            const maxOrb = 6.0; 
+
+            for (let i = 0; i < planetsCalculated.length; i++) {
+                for (let j = i + 1; j < planetsCalculated.length; j++) {
+                    const p1 = planetsCalculated[i];
+                    const p2 = planetsCalculated[j];
+
+                    // Hitung selisih derajat kompas horizontal (Azimut)
+                    let diff = Math.abs(p1.az - p2.az);
+                    if (diff > 180) diff = 360 - diff;
+
+                    majorAspects.forEach(asp => {
+                        const orb = Math.abs(diff - asp.angle);
+                        if (orb <= maxOrb) {
+                            aspectRowsHTML += `
+                                <tr>
+                                    <td style="font-weight: 700; text-transform: uppercase;">${p1.symbol} ${p1.name}</td>
+                                    <td><span class="aspect-badge">${asp.symbol} ${asp.name}</span></td>
+                                    <td style="font-weight: 700; text-transform: uppercase;">${p2.symbol} ${p2.name}</td>
+                                    <td style="font-family: 'Roboto Mono'; font-weight: 500;">${diff.toFixed(1)}° (AZ)</td>
+                                    <td style="font-family: 'Roboto Mono'; color: ${orb > 4 ? 'var(--text-secondary)' : 'var(--text-primary)'}">+${orb.toFixed(1)}°</td>
+                                </tr>
+                            `;
+                        }
+                    });
+                }
+            }
+
+            tableBody.innerHTML = aspectRowsHTML || `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); font-family: 'Roboto Mono';">NO RADIAL COMPASS ASPECTS DETECTED WITHIN 6° ORB</td></tr>`;
+        }
+
+        function renderDualLayout() {
+            const showL1 = document.getElementById('layer1').checked;
+            const showL2 = document.getElementById('layer2').checked;
+            const showL3 = document.getElementById('layer3').checked;
+            const showL4 = document.getElementById('layer4').checked;
+            const showL6 = document.getElementById('layer6').checked;
+
+            zCtx.clearRect(0, 0, 440, 440);
+            nCtx.clearRect(0, 0, 440, 440);
+
+            [
+                { ctx: zCtx, label: 'ZENITH', isZenithMode: true },
+                { ctx: nCtx, label: 'NADIR', isZenithMode: false }
+            ].forEach(target => {
+                const c = target.ctx;
+                const coordFunc = target.isZenithMode ? getZenithCoords : getNadirCoords;
+
+                c.beginPath();
+                c.moveTo(cx, cy - r4); c.lineTo(cx, cy + r4);
+                c.moveTo(cx - r4, cy); c.lineTo(cx + r4, cy);
+                c.strokeStyle = '#f5f5f5'; c.lineWidth = 1;
+                c.stroke();
+
+                if (showL6) {
+                    drawRingCircle(c, r6, '#e5e5e5', 1);
+                    let curA = siriusAzRad;
+                    iauZodiacs.forEach(zod => {
+                        let sweep = (zod.days / 365) * 2 * Math.PI;
+                        let pOut = coordFunc(r6, curA);
+                        let pIn = coordFunc(r4, curA);
+                        c.beginPath(); c.moveTo(pOut.x, pOut.y); c.lineTo(pIn.x, pIn.y);
+                        c.strokeStyle = '#f5f5f5'; c.stroke();
+                        
+                        let mid = curA + (sweep / 2);
+                        let pTxt = coordFunc(r6 - 14, mid);
+                        c.fillStyle = '#a0a0a5'; c.font = '500 8px Helvetica, Arial';
+                        c.textAlign = 'center'; c.textBaseline = 'middle';
+                        c.fillText(zod.name, pTxt.x, pTxt.y);
+                        curA += sweep;
+                    });
+                }
+
+                if (showL4) {
+                    drawRingCircle(c, r4, '#000000', 1.5);
+                    drawCompassScaleGrid(c, r4, r3, '#e5e5e5', '#707072', 1, siriusAzRad, target.isZenithMode);
+                    let pSirius = coordFunc(r4, siriusAzRad);
+                    drawPlanetNode(c, pSirius.x, pSirius.y, '★', '#000000', 'SIRIUS', '#ffffff', '#000000');
+                }
+
+                if (showL3) {
+                    drawRingCircle(c, r3, '#cccccc', 1);
+                    drawCompassScaleGrid(c, r3, r2, '#f5f5f5', '#909095', 13, siriusAzRad, target.isZenithMode);
+                }
+
+                if (showL2) {
+                    drawRingCircle(c, r2, '#cccccc', 1);
+                    drawCompassScaleGrid(c, r2, r1, '#f5f5f5', '#909095', 25, siriusAzRad, target.isZenithMode);
+                }
+
+                const cardinalDistance = r4 + 16;
+                const directions = [
+                    { angle: 0, text: 'N', color: '#ff3b30' },       
+                    { angle: Math.PI / 2, text: target.isZenithMode ? 'E' : 'W', color: '#000000' },    
+                    { angle: Math.PI, text: 'S', color: '#000000' },        
+                    { angle: (3 * Math.PI) / 2, text: target.isZenithMode ? 'W' : 'E', color: '#000000' }
+                ];
+                directions.forEach(dir => {
+                    let cxOffset = target.isZenithMode ? Math.sin(dir.angle) : -Math.sin(dir.angle);
+                    let coord = {
+                        x: cx + cardinalDistance * cxOffset,
+                        y: cy - cardinalDistance * Math.cos(dir.angle)
+                    };
+                    c.fillStyle = dir.color;
+                    c.font = '900 11px Helvetica, Arial';
+                    c.textAlign = 'center'; c.textBaseline = 'middle';
+                    c.fillText(dir.text, coord.x, coord.y);
+                });
+
+                if (showL1) {
+                    drawRingCircle(c, r1, '#000000', 1);
+                    drawPlanetNode(c, cx, cy, target.label[0], '#000000', target.label, '#ffffff', '#000000');
+                }
+            });
+
+            planetsCalculated.forEach(p => {
+                let parsedColor = p.color.includes('var') ? varColor(p.color.match(/\(([^)]+)\)/)[1]) : p.color;
+
+                if (p.isZenith) {
+                    let renderStatus = false;
+                    if (p.alt < 30 && showL4) renderStatus = true;
+                    if (p.alt >= 30 && p.alt < 60 && showL3) renderStatus = true;
+                    if (p.alt >= 60 && p.alt <= 90 && showL2) renderStatus = true;
+
+                    if (renderStatus) {
+                        let coord = getZenithCoords(p.zRadius, p.azRad);
+                        drawPlanetNode(zCtx, coord.x, coord.y, p.symbol, '#000000', p.name, '#ffffff', parsedColor);
+                    }
+                } else {
+                    let absAlt = Math.abs(p.alt);
+                    let renderStatus = false;
+                    if (absAlt < 30 && showL4) renderStatus = true;
+                    if (absAlt >= 30 && absAlt < 60 && showL3) renderStatus = true;
+                    if (absAlt >= 60 && absAlt <= 90 && showL2) renderStatus = true;
+
+                    if (renderStatus) {
+                        let coord = getNadirCoords(p.nRadius, p.azRad);
+                        drawPlanetNode(nCtx, coord.x, coord.y, p.symbol, '#000000', p.name, '#ffffff', parsedColor);
+                    }
+                }
+            });
+        }
+
+        function drawRingCircle(c, radius, color, width) {
+            c.beginPath(); c.arc(cx, cy, radius, 0, 2 * Math.PI);
+            c.strokeStyle = color; c.lineWidth = width; c.stroke();
+        }
+
+        function drawCompassScaleGrid(c, outerRadius, innerRadius, lineColor, textColor, startNumber, anchorOffset, isZenithMode) {
+            const coordFunc = isZenithMode ? getZenithCoords : getNadirCoords;
+            for (let i = 0; i < 12; i++) {
+                let angle = (i * 30) * Math.PI / 180 + anchorOffset;
+                let pOuter = coordFunc(outerRadius, angle);
+                let pInner = coordFunc(innerRadius, angle);
+                
+                c.beginPath(); c.moveTo(pOuter.x, pOuter.y); c.lineTo(pInner.x, pInner.y);
+                c.strokeStyle = lineColor; c.lineWidth = 1;
+                c.stroke();
+
+                let midAngle = (i * 30 + 15) * Math.PI / 180 + anchorOffset;
+                let textRadius = innerRadius + ((outerRadius - innerRadius) / 2);
+                let pText = coordFunc(textRadius, midAngle);
+                
+                c.fillStyle = textColor; c.font = '500 8px Helvetica, Arial';
+                c.textAlign = 'center'; c.textBaseline = 'middle';
+                c.fillText((startNumber + i), pText.x, pText.y); 
+            }
+        }
+
+        function drawPlanetNode(c, x, y, symbol, strokeColor, label, bgColor, brandBorderColor = '#000000') {
+            c.beginPath(); c.arc(x, y, 11, 0, 2 * Math.PI); 
+            c.fillStyle = bgColor; c.fill();
+            c.strokeStyle = brandBorderColor; c.lineWidth = 1.5; 
+            c.stroke();
+
+            c.fillStyle = '#000000'; c.font = '11px sans-serif';
+            c.textAlign = 'center'; c.textBaseline = 'middle';
+            c.fillText(symbol, x, y + 0.5);
+
+            c.fillStyle = '#000000'; c.font = 'bold 8px Helvetica, Arial';
+            c.fillText(label.toUpperCase(), x, y - 15);
+        }
+
+        function varColor(varName) {
+            return getComputedStyle(document.documentElement).getPropertyValue('--' + varName.trim()).trim();
+        }
+    </script>
+</body>
+</html>

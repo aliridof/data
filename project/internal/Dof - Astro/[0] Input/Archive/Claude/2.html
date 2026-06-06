@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Ignore Live Preview injection in dev environment -->
+<script>
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('github.dev')) {
+    document.currentScript.remove();
+  }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOF-ASTRO v3.0 — Live Configuration Matrix</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+
+<style>
+:root {
+  --bg:#f4f4f4;
+  --surface:#fff;
+  --border:#ddd;
+  --text:#111;
+  --muted:#666;
+  --faint:#999;
+  --mono:'SF Mono','Courier New',monospace;
+  --sans:'Helvetica Neue','Inter',Arial,sans-serif;
+
+  --green:#2e7d32; --green-bg:#e8f5e9;
+  --blue:#1565c0;  --blue-bg:#e3f2fd;
+  --cyan:#00838f;  --cyan-bg:#e0f7fa;
+  --yellow:#e65100;--yellow-bg:#fff8e1;
+  --red:#c62828;   --red-bg:#ffebee;
+  --purple:#6a1b9a;--purple-bg:#f3e5f5;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);padding:14px;min-height:100vh;}
+.wrap{max-width:1600px;margin:0 auto;}
+
+/* HEADER */
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;
+  padding-bottom:10px;border-bottom:2px solid #111;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.hdr-left h1{font-size:22px;font-weight:900;letter-spacing:-.5px;}
+.hdr-left p{font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px;}
+.hdr-right{font-size:9px;color:var(--faint);text-align:right;line-height:1.6;}
+
+/* STATUS BAR */
+.sbar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.sbadge{padding:3px 10px;border-radius:12px;font-size:8px;font-weight:700;
+  letter-spacing:.8px;border:1px solid;text-transform:uppercase;}
+.sb-ok  {background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;}
+.sb-warn{background:#fff3e0;color:#e65100;border-color:#ffcc80;}
+.sb-err {background:#ffebee;color:#c62828;border-color:#ef9a9a;}
+.sb-info{background:#e3f2fd;color:#1565c0;border-color:#90caf9;}
+.sb-load{background:#f3e5f5;color:#6a1b9a;border-color:#ce93d8;}
+
+/* MAP */
+#map{height:320px;border-radius:6px;border:1px solid var(--border);
+  margin-bottom:12px;background:#e8e8e8;}
+
+/* PANEL */
+.panel{background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;margin-bottom:12px;overflow:hidden;}
+.ph{padding:9px 14px;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;background:#fafafa;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;}
+.pb{padding:12px;}
+
+/* FORM */
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.col{flex:1;min-width:110px;}
+.col:last-child{margin-bottom:0;}
+label.lbl{display:block;font-size:8px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--muted);margin-bottom:4px;}
+input,select{width:100%;padding:7px 9px;border:1px solid var(--border);
+  border-radius:4px;font-size:11px;font-family:var(--mono);
+  background:#fafafa;color:var(--text);transition:.12s;}
+input:focus,select:focus{outline:none;border-color:#111;background:#fff;}
+
+/* SEARCH */
+.search-wrap{position:relative;}
+.search-drop{position:absolute;top:100%;left:0;right:0;background:#fff;
+  border:1px solid #ccc;border-top:none;border-radius:0 0 5px 5px;
+  z-index:3000;max-height:180px;overflow-y:auto;display:none;
+  box-shadow:0 4px 16px rgba(0,0,0,.12);}
+.sd-item{padding:7px 11px;cursor:pointer;font-size:10px;border-bottom:1px solid #f0f0f0;}
+.sd-item:hover{background:#f5f5f5;}
+.sd-item small{display:block;font-size:8px;color:var(--faint);margin-top:1px;}
+
+/* BUTTONS */
+.btn{padding:7px 16px;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.8px;cursor:pointer;border:2px solid #111;
+  border-radius:4px;background:#fff;transition:.12s;white-space:nowrap;}
+.btn-primary{background:#111;color:#fff;}
+.btn-primary:hover{background:#333;}
+.btn-primary:disabled{background:#ccc;border-color:#ccc;cursor:not-allowed;}
+.btn:hover:not(:disabled){background:#f0f0f0;color:#111;}
+.btn-acts{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;}
+
+/* ALERT */
+.alert{padding:9px 12px;border-left:4px solid;border-radius:4px;
+  font-size:11px;margin-bottom:10px;}
+.al-ok  {background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.al-warn{background:var(--yellow-bg);border-color:var(--yellow);color:var(--yellow);}
+.al-err {background:var(--red-bg);border-color:var(--red);color:var(--red);}
+
+/* ZONE SUMMARY */
+.zones{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.zone-box{flex:1;min-width:70px;padding:8px 6px;border-radius:5px;
+  text-align:center;font-size:9px;font-weight:700;letter-spacing:.5px;}
+.z-green {background:var(--green-bg);color:var(--green);}
+.z-blue  {background:var(--blue-bg); color:var(--blue);}
+.z-cyan  {background:var(--cyan-bg); color:var(--cyan);}
+.z-yellow{background:var(--yellow-bg);color:var(--yellow);}
+.z-red   {background:var(--red-bg);  color:var(--red);}
+.zone-n{font-size:20px;line-height:1.2;display:block;}
+
+/* TRIGGER BADGES */
+.trigger-wrap{margin-bottom:10px;padding:9px 12px;
+  background:#fafafa;border:1px solid #eee;border-radius:4px;}
+.trigger-wrap p{font-size:9px;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.tbadge{display:inline-block;padding:2px 9px;border-radius:10px;
+  font-size:9px;font-weight:700;cursor:pointer;margin:2px;
+  border:1px solid #ccc;background:#fff;transition:.1s;}
+.tbadge:hover{background:#e0e0e0;}
+
+/* MATRIX */
+.mx-wrap{overflow:auto;max-height:420px;}
+table.mx{border-collapse:collapse;font-family:var(--mono);font-size:8px;}
+table.mx th,table.mx td{padding:3px 5px;text-align:center;
+  border:1px solid #eee;white-space:nowrap;}
+table.mx thead th{background:#f5f5f5;font-weight:700;
+  position:sticky;top:0;z-index:2;font-size:7px;}
+table.mx tbody th{background:#fafafa;font-weight:700;
+  position:sticky;left:0;z-index:1;font-size:7px;}
+.c-diag  {background:#111!important;color:#111!important;}
+.c-off   {background:#fafafa;color:#e0e0e0;}
+.c-raw   {color:#bbb;}
+.c-green {background:var(--green-bg);color:#1b5e20;font-weight:700;}
+.c-blue  {background:var(--blue-bg); color:#0d47a1;font-weight:700;}
+.c-cyan  {background:var(--cyan-bg); color:#006064;font-weight:700;}
+.c-yellow{background:var(--yellow-bg);color:#bf360c;font-weight:700;}
+.c-red   {background:var(--red-bg);  color:#b71c1c;font-weight:700;}
+.c-purple{background:var(--purple-bg);color:var(--purple);font-weight:700;}
+
+/* ENTITY TABLE */
+table.etbl{border-collapse:collapse;width:100%;font-size:10px;}
+table.etbl th{background:#f5f5f5;font-size:8px;text-transform:uppercase;
+  letter-spacing:.6px;padding:5px 8px;text-align:left;border-bottom:1px solid #eee;}
+table.etbl td{padding:5px 8px;border-bottom:1px solid #f5f5f5;
+  font-family:var(--mono);font-size:9px;}
+table.etbl tr:hover td{background:#fafafa;}
+.above{color:var(--green);font-weight:700;}
+.below{color:var(--red);}
+
+/* PULSE */
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(106,27,154,.5);}
+  50%{box-shadow:0 0 0 5px rgba(106,27,154,.1);}
+}
+.pulse{animation:pulse 1s ease-in-out 3;position:relative;z-index:3;}
+
+/* LOADING */
+#loading{display:none;padding:20px;text-align:center;
+  font-size:11px;letter-spacing:2px;color:var(--faint);}
+#loading.on{display:block;}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.tab{padding:7px 14px;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.8px;cursor:pointer;border-bottom:2px solid transparent;
+  color:var(--muted);transition:.1s;}
+.tab.active{border-bottom-color:#111;color:#111;}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* FOOTER */
+.footer{margin-top:12px;padding-top:8px;border-top:1px solid var(--border);
+  font-size:8px;color:var(--faint);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;}
+
+/* RESPONSIVE */
+@media(max-width:700px){
+  .row{flex-direction:column;}
+  .zones{flex-wrap:wrap;}
+  .zone-box{min-width:calc(33% - 6px);}
+  #map{height:240px;}
+  .mx-wrap{max-height:300px;}
+  .hdr{padding-bottom:6px;margin-bottom:8px;}
+  .hdr-left h1{font-size:18px;}
+  .hdr-right{font-size:7px;}
+}
+
+@media(max-width:480px){
+  body{padding:8px;}
+  .zone-box{min-width:calc(50% - 3px);}
+  #map{height:200px;}
+  table.mx{font-size:7px;}
+  table.mx th,table.mx td{padding:2px 3px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <h1>DOF·ASTRO v3.0</h1>
+      <p>Live Celestial Configuration Matrix</p>
+    </div>
+    <div class="hdr-right">
+      Leaflet 1.9.4 &nbsp;·&nbsp; Luxon 3.4.4<br>
+      SwissEph WASM &nbsp;·&nbsp; Nominatim &nbsp;·&nbsp; CartoDB
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="sbar">
+    <span class="sbadge sb-load" id="st-swe">⏳ SwissEph Loading…</span>
+    <span class="sbadge sb-info" id="st-map">🗺 Map Ready</span>
+    <span class="sbadge sb-info" id="st-time" style="font-family:var(--mono)">--:--:-- UTC</span>
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- INPUT PANEL -->
+  <div class="panel">
+    <div class="ph">📍 Location &amp; Time Configuration</div>
+    <div class="pb">
+      <div class="row">
+        <div class="col search-wrap" style="flex:2">
+          <label class="lbl">Search Location</label>
+          <input type="text" id="searchInput" placeholder="Type city or place name…" autocomplete="off"/>
+          <div id="searchDrop" class="search-drop"></div>
+        </div>
+        <div class="col">
+          <label class="lbl">Latitude °</label>
+          <input type="number" id="latIn" value="-6.2088" step="0.0001" min="-90" max="90"/>
+        </div>
+        <div class="col">
+          <label class="lbl">Longitude °</label>
+          <input type="number" id="lonIn" value="106.8456" step="0.0001" min="-180" max="180"/>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label class="lbl">Time Zone</label>
+          <select id="tzSel"></select>
+        </div>
+        <div class="col">
+          <label class="lbl">Date &amp; Time</label>
+          <input type="datetime-local" id="dtIn"/>
+        </div>
+        <div class="col btn-acts">
+          <button class="btn btn-primary" id="btnCalc" disabled>⚡ Calculate</button>
+          <button class="btn" id="btnNow">🕐 Now</button>
+          <button class="btn" id="btnReset">↺</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading">⚙ Computing celestial positions…</div>
+
+  <!-- OUTPUT -->
+  <div id="output"></div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>15 Entities (TZ·TN·CZ·CN + 10 Planets + Sirius) &nbsp;·&nbsp; 16 Aspects &nbsp;·&nbsp; ORB ±1°</span>
+    <span>DOF·ASTRO v3.0 &nbsp;·&nbsp; Swiss Ephemeris (AGPL-3.0)</span>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- SwissEph WASM — Enhanced Loading with CDN Config -->
+<script>
+// Pre-configure WASM CDN URLs
+window._sweConfig = {
+  wasmBinary: 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/wasm/swisseph.wasm',
+  wasmLoader: 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/wasm/swisseph.js',
+  mainJS: 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js'
+};
+
+window._sweReady = false;
+window._sweError = null;
+
+// Load WASM + JS with robust error handling
+async function initSwissEph() {
+  try {
+    console.log('🔄 SwissEph: Loading from CDN...');
+    console.log('   WASM Binary:', window._sweConfig.wasmBinary);
+    console.log('   Main JS:', window._sweConfig.mainJS);
+    
+    // Import and initialize SwissEph
+    const module = await import(window._sweConfig.mainJS);
+    const initSwe = module.default || module.init;
+    
+    if (!initSwe) {
+      throw new Error('No default export from SwissEph module');
+    }
+    
+    const swe = await initSwe();
+    window.swe = swe;
+    window._sweReady = true;
+    
+    document.getElementById('st-swe').textContent = '✓ SwissEph Ready';
+    document.getElementById('st-swe').className = 'sbadge sb-ok';
+    document.getElementById('btnCalc').disabled = false;
+    console.log('✓ SwissEph initialized successfully');
+    
+  } catch (err) {
+    console.error('❌ SwissEph error:', err);
+    window._sweError = err.message;
+    
+    // Enhanced error reporting
+    let errMsg = 'SwissEph Failed';
+    if (err.message.includes('Failed to fetch')) {
+      errMsg = '✗ CDN Unreachable';
+    } else if (err.message.includes('404')) {
+      errMsg = '✗ File Not Found';
+    } else if (err.message.includes('import') || err.message.includes('module')) {
+      errMsg = '✗ Module Load Error';
+    } else if (err.message.includes('WASM')) {
+      errMsg = '✗ WASM Init Error';
+    }
+    
+    document.getElementById('st-swe').textContent = errMsg;
+    document.getElementById('st-swe').className = 'sbadge sb-err';
+    document.getElementById('st-swe').title = err.message;
+    document.getElementById('st-swe').style.cursor = 'help';
+  }
+}
+
+// Start initialization immediately
+initSwissEph();
+</script>
+
+<script>
+(function(){
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+const { DateTime, Info } = luxon;
+
+const SE_GREG_CAL   = 1;
+const SEFLG_SPEED   = 256;
+const SEFLG_EQUATORIAL = 2048;
+const CALC_FLAG     = SEFLG_SPEED | SEFLG_EQUATORIAL;
+
+const SE_BODY = {
+  Sun:0, Moon:1, Mercury:2, Venus:3, Mars:4,
+  Jupiter:5, Saturn:6, Uranus:7, Neptune:8, Pluto:9
+};
+
+const PLANET_SYMBOLS = {
+  Sun:'☉', Moon:'☽', Mercury:'☿', Venus:'♀', Mars:'♂',
+  Jupiter:'♃', Saturn:'♄', Uranus:'⛢', Neptune:'♆', Pluto:'♇',
+  Sirius:'✦'
+};
+
+const PLANET_COLORS = {
+  Sun:'#f9a825', Moon:'#9e9e9e', Mercury:'#ff8a65',
+  Venus:'#f48fb1', Mars:'#ef5350', Jupiter:'#ffb74d',
+  Saturn:'#ffe082', Uranus:'#4fc3f7', Neptune:'#1565c0',
+  Pluto:'#8d6e63', Sirius:'#e0e0e0'
+};
+
+const PLANET_SHORT = {
+  Sun:'SUN', Moon:'MON', Mercury:'MER', Venus:'VEN', Mars:'MAR',
+  Jupiter:'JUP', Saturn:'SAT', Uranus:'URA', Neptune:'NEP',
+  Pluto:'PLU', Sirius:'SUI'
+};
+
+const ASPECTS = [
+  {name:'Konjungsi',   angle:0,       zone:'CYAN',   cls:'c-cyan'},
+  {name:'Semi-Sekstil',angle:30,      zone:'CYAN',   cls:'c-cyan'},
+  {name:'Septil',      angle:51.429,  zone:'CYAN',   cls:'c-cyan'},
+  {name:'Sekstil',     angle:60,      zone:'BLUE',   cls:'c-blue'},
+  {name:'Kuintil',     angle:72,      zone:'BLUE',   cls:'c-blue'},
+  {name:'Biseptil',    angle:102.857, zone:'CYAN',   cls:'c-cyan'},
+  {name:'Novil',       angle:40,      zone:'BLUE',   cls:'c-blue'},
+  {name:'Binovil',     angle:80,      zone:'BLUE',   cls:'c-blue'},
+  {name:'Semi-Kuadrat',angle:45,      zone:'YELLOW', cls:'c-yellow'},
+  {name:'Trigon',      angle:120,     zone:'GREEN',  cls:'c-green'},
+  {name:'Kuadrat',     angle:90,      zone:'RED',    cls:'c-red'},
+  {name:'Triseptil',   angle:154.286, zone:'CYAN',   cls:'c-cyan'},
+  {name:'Bikuintil',   angle:144,     zone:'BLUE',   cls:'c-blue'},
+  {name:'Seskikuadrat',angle:135,     zone:'RED',    cls:'c-red'},
+  {name:'Kuinkunks',   angle:150,     zone:'YELLOW', cls:'c-yellow'},
+  {name:'Oposisi',     angle:180,     zone:'RED',    cls:'c-red'},
+];
+
+const ORB = 1.0;
+
+const DEFAULT_LAT = -6.2088;
+const DEFAULT_LON = 106.8456;
+
+// ═══════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════
+let map, mainMarker, planetMarkers = [];
+let searchTimer;
+let _searchData = [];
+let _lastResult = null;
+
+// ═══════════════════════════════════════════════════════
+// SWE HELPERS
+// ═══════════════════════════════════════════════════════
+async function waitSwe(ms=20000){
+  if(window._sweReady) return window.swe;
+  const t0=Date.now();
+  while(!window._sweReady){
+    if(Date.now()-t0>ms) throw new Error('SwissEph WASM timeout.');
+    await new Promise(r=>setTimeout(r,120));
+  }
+  return window.swe;
+}
+
+function sweJD(utcDate){
+  const s=window.swe;
+  return s.julday(
+    utcDate.getUTCFullYear(),
+    utcDate.getUTCMonth()+1,
+    utcDate.getUTCDate(),
+    utcDate.getUTCHours()+utcDate.getUTCMinutes()/60+utcDate.getUTCSeconds()/3600,
+    SE_GREG_CAL
+  );
+}
+
+function sweGMST(jd){
+  // sidtime() returns sidereal time in hours
+  return ((window.swe.sidtime(jd)*15)%360+360)%360;
+}
+
+function swePlanet(bodyId, jd){
+  const r=window.swe.calc_ut(jd, bodyId, CALC_FLAG);
+  if(r && r.error) throw new Error(`calc_ut error: ${r.error}`);
+  // equatorial: r[0]=RA°, r[1]=Dec°
+  return {ra:r[0], dec:r[1]};
+}
+
+function sweSirius(jd){
+  try{
+    const r=window.swe.fixstar2_ut('Sirius',jd,CALC_FLAG);
+    if(r && r.error) throw new Error(r.error);
+    return {ra:r[0], dec:r[1]};
+  }catch(e){
+    console.warn('fixstar2_ut Sirius fallback:',e);
+    return {ra:101.2875, dec:-16.7161};
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ASTRONOMY MATH
+// ═══════════════════════════════════════════════════════
+const RAD=Math.PI/180;
+
+function eqToHoriz(ra, dec, lat, lst){
+  const ha=((lst-ra)+360)%360;
+  const sinAlt=Math.sin(dec*RAD)*Math.sin(lat*RAD)
+              +Math.cos(dec*RAD)*Math.cos(lat*RAD)*Math.cos(ha*RAD);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))/RAD;
+  const cosAz=(Math.sin(dec*RAD)-sinAlt*Math.sin(lat*RAD))
+              /(Math.cos(Math.asin(sinAlt))*Math.cos(lat*RAD));
+  let az=Math.acos(Math.max(-1,Math.min(1,cosAz)))/RAD;
+  if(Math.sin(ha*RAD)>0) az=360-az;
+  return {alt, az};
+}
+
+function subPoint(ra, dec, jd){
+  const gmst=sweGMST(jd);
+  const lat=dec;
+  let lon=((ra-gmst)+360)%360;
+  if(lon>180) lon-=360;
+  return {lat, lon};
+}
+
+function greatCircle(ra1,dec1,ra2,dec2){
+  const dRA=(ra1-ra2)*RAD;
+  const d1=dec1*RAD, d2=dec2*RAD;
+  const c=Math.sin(d1)*Math.sin(d2)+Math.cos(d1)*Math.cos(d2)*Math.cos(dRA);
+  return Math.acos(Math.max(-1,Math.min(1,c)))/RAD;
+}
+
+function matchAspect(theta){
+  let best=null, bestOrb=ORB;
+  for(const a of ASPECTS){
+    const dev=Math.abs(theta-a.angle);
+    if(dev<=bestOrb){bestOrb=dev;best=a;}
+  }
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD ENTITIES
+// ═══════════════════════════════════════════════════════
+async function buildEntities(lat, lon, jd){
+  const gmst=sweGMST(jd);
+  const lst=((gmst+lon)+360)%360;
+  const entities=[];
+
+  // 4 geometric points
+  entities.push({
+    name:'Titik Zenith',short:'TZ',sym:'TZ',type:'geo',
+    ra:lst, dec:lat, above:true,
+    subLat:lat, subLon:lon
+  });
+  let tnLon=lon+180; if(tnLon>180)tnLon-=360;
+  entities.push({
+    name:'Titik Nadir',short:'TN',sym:'TN',type:'geo',
+    ra:(lst+180)%360, dec:-lat, above:false,
+    subLat:-lat, subLon:tnLon
+  });
+  entities.push({
+    name:'Cusp Zenith',short:'CZ',sym:'CZ',type:'geo',
+    ra:lst, dec:lat, above:true,
+    subLat:lat, subLon:lon
+  });
+  entities.push({
+    name:'Cusp Nadir',short:'CN',sym:'CN',type:'geo',
+    ra:(lst+180)%360, dec:-lat, above:false,
+    subLat:-lat, subLon:tnLon
+  });
+
+  // 10 planets
+  for(const [pname, bid] of Object.entries(SE_BODY)){
+    try{
+      const {ra,dec}=swePlanet(bid,jd);
+      const horiz=eqToHoriz(ra,dec,lat,lst);
+      const sub=subPoint(ra,dec,jd);
+      entities.push({
+        name:pname, short:PLANET_SHORT[pname],
+        sym:PLANET_SYMBOLS[pname], type:'planet',
+        ra, dec, above:horiz.alt>0,
+        alt:horiz.alt, az:horiz.az,
+        subLat:sub.lat, subLon:sub.lon
+      });
+    }catch(e){
+      console.error(`Planet ${pname} error:`,e);
+    }
+  }
+
+  // Sirius
+  try{
+    const {ra,dec}=sweSirius(jd);
+    const horiz=eqToHoriz(ra,dec,lat,lst);
+    const sub=subPoint(ra,dec,jd);
+    entities.push({
+      name:'Sirius', short:'SUI',
+      sym:PLANET_SYMBOLS['Sirius'], type:'sirius',
+      ra, dec, above:horiz.alt>0,
+      alt:horiz.alt, az:horiz.az,
+      subLat:sub.lat, subLon:sub.lon
+    });
+  }catch(e){
+    console.error('Sirius error:',e);
+  }
+
+  return entities;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD MATRICES
+// ═══════════════════════════════════════════════════════
+function isZenith(e){
+  if(e.type==='geo') return e.short==='TZ'||e.short==='CZ';
+  return e.above===true;
+}
+function isNadir(e){
+  if(e.type==='geo') return e.short==='TN'||e.short==='CN';
+  return e.above===false;
+}
+
+function buildMatrices(entities){
+  const n=entities.length;
+  const m1=[],m2=[],pairs1=[],pairs2=[];
+
+  for(let i=0;i<n;i++){
+    m1[i]=[]; m2[i]=[];
+    for(let j=0;j<n;j++){
+      if(i===j){
+        m1[i][j]={t:'diag'};
+        m2[i][j]={t:'diag'};
+        continue;
+      }
+      const e1=entities[i], e2=entities[j];
+      const theta=Math.round(greatCircle(e1.ra,e1.dec,e2.ra,e2.dec)*10)/10;
+      const asp=matchAspect(theta);
+      const cell={t:'raw',theta,asp,e1:e1.short,e2:e2.short,i,j};
+
+      m2[i][j]={...cell};
+      pairs2.push({...cell});
+
+      const zenBoth=isZenith(e1)&&isZenith(e2);
+      const nadBoth=isNadir(e1)&&isNadir(e2);
+
+      if(j>i && zenBoth){
+        m1[i][j]={...cell,t:'active',zone:'zenith'};
+        pairs1.push({...cell,t:'active',zone:'zenith'});
+      } else if(j<i && nadBoth){
+        m1[i][j]={...cell,t:'active',zone:'nadir'};
+        pairs1.push({...cell,t:'active',zone:'nadir'});
+      } else {
+        m1[i][j]={t:'off'};
+      }
+    }
+  }
+  return {m1,m2,pairs1,pairs2,n};
+}
+
+// ═══════════════════════════════════════════════════════
+// DETECTION
+// ═══════════════════════════════════════════════════════
+function detect(pairs1, pairs2){
+  const zc={GREEN:0,BLUE:0,CYAN:0,YELLOW:0,RED:0};
+  const ac={};
+  const triggers=[];
+
+  for(const p of pairs1){
+    if(p.t==='active' && p.asp){
+      zc[p.asp.zone]=(zc[p.asp.zone]||0)+1;
+      ac[p.asp.name]=(ac[p.asp.name]||0)+1;
+    }
+  }
+
+  for(const [z,v] of Object.entries(zc)){
+    if(v>3) triggers.push({msg:`${z} ×${v}`,type:'zone',val:z});
+  }
+  for(const [a,v] of Object.entries(ac)){
+    if(v>3) triggers.push({msg:`${a} ×${v}`,type:'aspect',val:a});
+  }
+
+  // Identical angle detection (M2)
+  const hist={};
+  for(const p of pairs2){
+    const k=p.theta.toFixed(1);
+    if(!hist[k]) hist[k]={theta:parseFloat(k),count:0,pairs:[]};
+    hist[k].count++;
+    hist[k].pairs.push(p);
+  }
+
+  let maxC=0, maxTheta=null, maxPairs=[];
+  for(const v of Object.values(hist)){
+    if(v.count>maxC){maxC=v.count;maxTheta=v.theta;maxPairs=v.pairs;}
+  }
+
+  const m2Hit=maxC>3;
+  if(m2Hit) triggers.push({
+    msg:`Identik ${maxTheta}° ×${maxC}`,
+    type:'m2',val:maxTheta,pairs:maxPairs
+  });
+
+  const hlSet=new Set();
+  if(m2Hit){
+    for(const p of maxPairs){
+      hlSet.add(`${p.i}|${p.j}`);
+      hlSet.add(`${p.j}|${p.i}`);
+    }
+  }
+
+  return {triggers,zc,ac,m2Hit,maxTheta,maxPairs,hlSet};
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN CALCULATE
+// ═══════════════════════════════════════════════════════
+async function calculate(){
+  const btn=document.getElementById('btnCalc');
+  btn.disabled=true;
+  document.getElementById('loading').classList.add('on');
+  document.getElementById('output').innerHTML='';
+
+  try{
+    await waitSwe();
+
+    const lat =parseFloat(document.getElementById('latIn').value);
+    const lon =parseFloat(document.getElementById('lonIn').value);
+    const zone=document.getElementById('tzSel').value;
+    const dtStr=document.getElementById('dtIn').value;
+
+    if(!dtStr) throw new Error('Pilih tanggal dan waktu terlebih dahulu.');
+    if(isNaN(lat)||isNaN(lon)) throw new Error('Koordinat tidak valid.');
+
+    const dt=DateTime.fromISO(dtStr,{zone});
+    if(!dt.isValid) throw new Error('Format waktu tidak valid: '+dt.invalidReason);
+
+    const utcDate=dt.toUTC().toJSDate();
+    const jd=sweJD(utcDate);
+
+    const entities=await buildEntities(lat,lon,jd);
+    if(entities.length<4) throw new Error('Gagal menghitung posisi planet.');
+
+    const {m1,m2,pairs1,pairs2,n}=buildMatrices(entities);
+    const det=detect(pairs1,pairs2);
+
+    _lastResult={lat,lon,dt,zone,entities,m1,m2,det,n};
+
+    // update map markers
+    clearPlanetMarkers();
+    mainMarker.setLatLng([lat,lon]);
+    map.setView([lat,lon],map.getZoom());
+    for(const e of entities){
+      if(e.type==='planet'||e.type==='sirius'){
+        addPlanetMarker(e);
+      }
+    }
+
+    renderOutput(_lastResult);
+
+  }catch(err){
+    document.getElementById('output').innerHTML=
+      `<div class="alert al-err"><strong>⚠ Error:</strong> ${err.message}</div>`;
+    console.error(err);
+  }finally{
+    document.getElementById('loading').classList.remove('on');
+    btn.disabled=false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER OUTPUT
+// ═══════════════════════════════════════════════════════
+function renderOutput({lat,lon,dt,zone,entities,m1,m2,det,n}){
+  const hasT=det.triggers.length>0;
+  let h='';
+
+  // Status alert
+  h+=`<div class="alert ${hasT?'al-warn':'al-ok'}">
+    <strong>${hasT?'⚠ ANOMALY DETECTED':'✓ NORMAL CONFIGURATION'}</strong>
+    &nbsp;—&nbsp;
+    ${lat.toFixed(4)}°, ${lon.toFixed(4)}°
+    &nbsp;—&nbsp;
+    ${dt.toFormat('dd MMM yyyy HH:mm')} ${zone}
+    &nbsp;—&nbsp; JD ${sweJD(dt.toUTC().toJSDate()).toFixed(4)}
+  </div>`;
+
+  // Zone summary
+  h+='<div class="zones">';
+  const zoneDefs=[
+    {z:'GREEN',cls:'z-green'},{z:'BLUE',cls:'z-blue'},
+    {z:'CYAN',cls:'z-cyan'},{z:'YELLOW',cls:'z-yellow'},{z:'RED',cls:'z-red'}
+  ];
+  for(const {z,cls} of zoneDefs){
+    h+=`<div class="zone-box ${cls}">
+      <span class="zone-n">${det.zc[z]||0}</span>${z}
+    </div>`;
+  }
+  h+='</div>';
+
+  // Trigger badges
+  if(hasT){
+    h+='<div class="trigger-wrap"><p>Triggers Detected</p>';
+    for(const t of det.triggers){
+      h+=`<span class="tbadge" onclick="_pulse('${t.type}','${escAttr(String(t.val))}')">${t.msg}</span>`;
+    }
+    if(det.m2Hit && det.maxPairs.length){
+      h+='<br><small style="font-size:8px;color:#999;margin-top:4px;display:block;">Identical pairs: ';
+      h+=det.maxPairs.slice(0,10).map(p=>`${p.e1}–${p.e2}`).join(' ');
+      if(det.maxPairs.length>10) h+=` +${det.maxPairs.length-10} more`;
+      h+='</small>';
+    }
+    h+='</div>';
+  }
+
+  // Tabs
+  h+=`<div class="panel">
+    <div class="ph">Results</div>
+    <div class="pb">
+      <div class="tabs">
+        <div class="tab active" data-tab="t-m1">Matrix 1 — Aspect</div>
+        <div class="tab" data-tab="t-m2">Matrix 2 — Identical</div>
+        <div class="tab" data-tab="t-ent">Entity Table</div>
+      </div>
+      <div class="tab-pane active" id="t-m1">
+        <div class="mx-wrap">${buildMatrixHTML(m1,entities,n,det.hlSet,false)}</div>
+      </div>
+      <div class="tab-pane" id="t-m2">
+        <div class="mx-wrap">${buildMatrixHTML(m2,entities,n,det.hlSet,true)}</div>
+      </div>
+      <div class="tab-pane" id="t-ent">
+        ${buildEntityTable(entities)}
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('output').innerHTML=h;
+  initTabs();
+}
+
+function escAttr(s){return s.replace(/'/g,"\\'");}
+
+function buildMatrixHTML(matrix, entities, n, hlSet, isM2){
+  let t='<table class="mx"><thead><tr><th></th>';
+  for(let j=0;j<n;j++){
+    const e=entities[j];
+    t+=`<th title="${e.name}">${e.sym||e.short}</th>`;
+  }
+  t+='</tr></thead><tbody>';
+  for(let i=0;i<n;i++){
+    t+=`<tr><th title="${entities[i].name}">${entities[i].sym||entities[i].short}</th>`;
+    for(let j=0;j<n;j++){
+      const c=matrix[i][j];
+      if(!c){t+='<td class="c-raw">?</td>';continue;}
+
+      if(c.t==='diag'){
+        t+='<td class="c-diag">▪</td>';
+      } else if(c.t==='off'){
+        t+='<td class="c-off">·</td>';
+      } else {
+        const hl=hlSet&&hlSet.has(`${i}|${j}`);
+        let cls='c-raw', title='', label='';
+        if(hl){
+          cls='c-purple';
+          title=`IDENTIK ${c.theta}° | ${c.e1}–${c.e2}`;
+        } else if(c.asp){
+          cls=c.asp.cls;
+          title=`${c.asp.name} ${c.asp.angle}° (${c.theta}°) | ${c.e1}–${c.e2}`;
+        } else {
+          title=`${c.e1}–${c.e2} ${c.theta}°`;
+        }
+        label=c.theta.toFixed(1)+'°';
+        if(c.t==='off') cls='c-off';
+        t+=`<td class="${cls}" title="${title}">${label}</td>`;
+      }
+    }
+    t+='</tr>';
+  }
+  t+='</tbody></table>';
+  return t;
+}
+
+function buildEntityTable(entities){
+  let t=`<table class="etbl">
+    <thead><tr>
+      <th>#</th><th>Symbol</th><th>Name</th><th>Short</th><th>Type</th>
+      <th>RA °</th><th>Dec °</th><th>Status</th>
+      <th>Alt °</th><th>Az °</th>
+      <th>SubLat °</th><th>SubLon °</th>
+    </tr></thead><tbody>`;
+  entities.forEach((e,i)=>{
+    const abv=e.above===undefined?'—':e.above
+      ?'<span class="above">▲ Above</span>'
+      :'<span class="below">▼ Below</span>';
+    t+=`<tr>
+      <td>${i+1}</td>
+      <td style="font-size:14px;">${e.sym||''}</td>
+      <td>${e.name}</td>
+      <td>${e.short}</td>
+      <td>${e.type}</td>
+      <td>${typeof e.ra==='number'?e.ra.toFixed(4):'—'}</td>
+      <td>${typeof e.dec==='number'?e.dec.toFixed(4):'—'}</td>
+      <td>${abv}</td>
+      <td>${typeof e.alt==='number'?e.alt.toFixed(2):'—'}</td>
+      <td>${typeof e.az==='number'?e.az.toFixed(2):'—'}</td>
+      <td>${typeof e.subLat==='number'?e.subLat.toFixed(4):'—'}</td>
+      <td>${typeof e.subLon==='number'?e.subLon.toFixed(4):'—'}</td>
+    </tr>`;
+  });
+  t+='</tbody></table>';
+  return t;
+}
+
+// ═══════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════
+function initTabs(){
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      const pane=tab.dataset.tab;
+      tab.closest('.pb').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.closest('.pb').querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(pane).classList.add('active');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// PULSE
+// ═══════════════════════════════════════════════════════
+window._pulse=function(type,val){
+  document.querySelectorAll('.pulse').forEach(el=>el.classList.remove('pulse'));
+  const zMap={GREEN:'c-green',BLUE:'c-blue',CYAN:'c-cyan',YELLOW:'c-yellow',RED:'c-red'};
+  let sel='';
+  if(type==='zone')    sel='.'+zMap[val];
+  else if(type==='aspect') sel=`td[title*="${val}"]`;
+  else if(type==='m2') sel='.c-purple';
+  if(!sel) return;
+  document.querySelectorAll(sel).forEach(el=>{
+    el.classList.add('pulse');
+    setTimeout(()=>el.classList.remove('pulse'),3100);
+  });
+};
+
+// ═══════════════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════════════
+function initMap(){
+  map=L.map('map').setView([DEFAULT_LAT,DEFAULT_LON],5);
+  L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    {
+      attribution:'&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      subdomains:'abcd',
+      maxZoom:19,
+      detectRetina:true
+    }
+  ).addTo(map);
+
+  mainMarker=L.marker([DEFAULT_LAT,DEFAULT_LON],{
+    draggable:true, title:'Observation Point'
+  }).addTo(map).bindPopup('📍 Observation Point');
+
+  mainMarker.on('dragend',()=>{
+    const p=mainMarker.getLatLng();
+    document.getElementById('latIn').value=p.lat.toFixed(4);
+    document.getElementById('lonIn').value=p.lng.toFixed(4);
+  });
+
+  map.on('click',e=>{
+    mainMarker.setLatLng(e.latlng);
+    document.getElementById('latIn').value=e.latlng.lat.toFixed(4);
+    document.getElementById('lonIn').value=e.latlng.lng.toFixed(4);
+  });
+}
+
+function clearPlanetMarkers(){
+  planetMarkers.forEach(m=>map.removeLayer(m));
+  planetMarkers=[];
+}
+
+function addPlanetMarker(e){
+  const col=PLANET_COLORS[e.name]||'#888';
+  const icon=L.divIcon({
+    html:`<div style="font-size:15px;color:${col};
+            text-shadow:0 0 3px #000,0 0 6px #000;line-height:1;">${e.sym}</div>`,
+    className:'',iconSize:[20,20],iconAnchor:[10,10]
+  });
+  const m=L.marker([e.subLat,e.subLon],{icon,title:e.name}).addTo(map);
+  m.bindPopup(
+    `<strong>${e.sym} ${e.name}</strong><br>
+     RA: ${e.ra.toFixed(3)}°&nbsp; Dec: ${e.dec.toFixed(3)}°<br>
+     Sub: ${e.subLat.toFixed(2)}°, ${e.subLon.toFixed(2)}°<br>
+     ${e.above?'▲ Above Horizon':'▼ Below Horizon'}`
+  );
+  planetMarkers.push(m);
+}
+
+// ═══════════════════════════════════════════════════════
+// NOMINATIM SEARCH
+// ═══════════════════════════════════════════════════════
+document.getElementById('searchInput').addEventListener('input',function(){
+  clearTimeout(searchTimer);
+  const q=this.value.trim();
+  const drop=document.getElementById('searchDrop');
+  if(!q){drop.style.display='none';return;}
+  searchTimer=setTimeout(()=>doSearch(q),380);
+});
+
+async function doSearch(q){
+  const drop=document.getElementById('searchDrop');
+  drop.innerHTML='<div class="sd-item">Searching…</div>';
+  drop.style.display='block';
+  try{
+    const r=await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`,
+      {headers:{'User-Agent':'DOF-ASTRO/3.0','Accept-Language':'id,en;q=0.9'}}
+    );
+    const data=await r.json();
+    _searchData=data;
+    if(!data.length){drop.innerHTML='<div class="sd-item">Not found.</div>';return;}
+    drop.innerHTML=data.map((d,i)=>
+      `<div class="sd-item" data-i="${i}">
+        <strong>${d.display_name}</strong>
+        <small>${parseFloat(d.lat).toFixed(5)}, ${parseFloat(d.lon).toFixed(5)}</small>
+      </div>`
+    ).join('');
+  }catch(e){
+    drop.innerHTML=`<div class="sd-item">Error: ${e.message}</div>`;
+  }
+}
+
+document.getElementById('searchDrop').addEventListener('mousedown',function(e){
+  const item=e.target.closest('.sd-item[data-i]');
+  if(!item)return;
+  e.preventDefault();
+  const d=_searchData[parseInt(item.dataset.i)];
+  if(!d)return;
+  const lat=parseFloat(d.lat), lon=parseFloat(d.lon);
+  document.getElementById('latIn').value=lat.toFixed(4);
+  document.getElementById('lonIn').value=lon.toFixed(4);
+  document.getElementById('searchInput').value=d.display_name;
+  document.getElementById('searchDrop').style.display='none';
+  mainMarker.setLatLng([lat,lon]);
+  map.setView([lat,lon],10);
+});
+
+document.addEventListener('click',e=>{
+  const drop=document.getElementById('searchDrop');
+  if(!document.getElementById('searchInput').contains(e.target)&&
+     !drop.contains(e.target)){
+    drop.style.display='none';
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// TIMEZONE & TIME
+// ═══════════════════════════════════════════════════════
+function populateTZ(){
+  const sel=document.getElementById('tzSel');
+  const zones=(Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):Info.timezones)||[];
+  zones.forEach(z=>{
+    const o=document.createElement('option');
+    o.value=o.textContent=z;
+    sel.appendChild(o);
+  });
+  sel.value=Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Jakarta';
+}
+
+function setNow(){
+  const zone=document.getElementById('tzSel').value;
+  const now=DateTime.now().setZone(zone);
+  document.getElementById('dtIn').value=now.toFormat("yyyy-MM-dd'T'HH:mm");
+}
+
+// Live UTC clock
+function tickClock(){
+  const utc=DateTime.utc();
+  document.getElementById('st-time').textContent=
+    utc.toFormat('HH:mm:ss')+'  UTC';
+}
+setInterval(tickClock,1000);
+tickClock();
+
+// ═══════════════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════════════
+document.getElementById('btnNow').addEventListener('click',setNow);
+document.getElementById('btnCalc').addEventListener('click',calculate);
+document.getElementById('btnReset').addEventListener('click',()=>{
+  document.getElementById('latIn').value=DEFAULT_LAT;
+  document.getElementById('lonIn').value=DEFAULT_LON;
+  document.getElementById('searchInput').value='';
+  mainMarker.setLatLng([DEFAULT_LAT,DEFAULT_LON]);
+  map.setView([DEFAULT_LAT,DEFAULT_LON],5);
+  setNow();
+});
+
+// Enhanced input validation with feedback
+function validateAndUpdateCoords(){
+  const latEl=document.getElementById('latIn');
+  const lonEl=document.getElementById('lonIn');
+  const lat=parseFloat(latEl.value);
+  const lon=parseFloat(lonEl.value);
+  
+  // Validate latitude range
+  if(!isNaN(lat)){
+    if(lat<-90 || lat>90){
+      latEl.style.borderColor='#ef5350';
+      latEl.title='Latitude harus antara -90 hingga 90°';
+    } else {
+      latEl.style.borderColor='var(--border)';
+      latEl.title='';
+    }
+  }
+  
+  // Validate longitude range
+  if(!isNaN(lon)){
+    if(lon<-180 || lon>180){
+      lonEl.style.borderColor='#ef5350';
+      lonEl.title='Longitude harus antara -180 hingga 180°';
+    } else {
+      lonEl.style.borderColor='var(--border)';
+      lonEl.title='';
+    }
+  }
+  
+  // Update marker if both valid
+  if(!isNaN(lat)&&!isNaN(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180){
+    mainMarker.setLatLng([lat,lon]);
+  }
+}
+
+document.getElementById('latIn').addEventListener('change',validateAndUpdateCoords);
+document.getElementById('latIn').addEventListener('input',validateAndUpdateCoords);
+document.getElementById('lonIn').addEventListener('change',validateAndUpdateCoords);
+document.getElementById('lonIn').addEventListener('input',validateAndUpdateCoords);
+
+// ═══════════════════════════════════════════════════════
+// GLOBAL ERROR HANDLING
+// ═══════════════════════════════════════════════════════
+window.addEventListener('error',(event)=>{
+  console.error('Global error caught:',event.error);
+  if(!window._sweReady && event.error.message.includes('luxon')){
+    console.warn('Luxon error during init - non-critical');
+  }
+});
+
+window.addEventListener('unhandledrejection',(event)=>{
+  console.error('Unhandled promise rejection:',event.reason);
+});
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init(){
+  try{
+    initMap();
+    populateTZ();
+    setNow();
+    console.log('✓ DOF-ASTRO initialized successfully');
+  }catch(err){
+    console.error('❌ Initialization error:',err);
+    document.getElementById('output').innerHTML=
+      `<div class="alert al-err"><strong>⚠ Init Error:</strong> ${err.message}</div>`;
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',init);
+}else{
+  init();
+}
+
+})();
+</script>
+</body>
+</html>

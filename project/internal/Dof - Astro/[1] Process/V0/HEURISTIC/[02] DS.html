@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luck Window 24 Jam — Precision Engine v2.0</title>
+
+    <!-- Luxon — Zona Waktu -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js">
+    </script>
+
+    <!-- Chart.js — Grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --border: #1e1e30;
+            --text: #e0e0e0;
+            --text-secondary: #8888aa;
+            --gold: #d4a843;
+            --gold-glow: rgba(212, 168, 67, 0.3);
+            --positive: #2ecc71;
+            --positive-glow: rgba(46, 204, 113, 0.4);
+            --negative: #e74c3c;
+            --negative-glow: rgba(231, 76, 60, 0.4);
+            --neutral: #7f8c8d;
+            --accent: #6c5ce7;
+            --warning: #e67e22;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+            background-image:
+                radial-gradient(ellipse at 20% 20%, rgba(108, 92, 231, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(212, 168, 67, 0.04) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 24px 0 16px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--gold), #f0d78c, var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Card */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+        }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 140px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px var(--gold-glow);
+        }
+        .btn {
+            padding: 10px 22px;
+            background: linear-gradient(135deg, var(--gold), #c4963a);
+            color: #1a1a1a;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px var(--gold-glow);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .btn-sm:hover {
+            border-color: var(--gold);
+        }
+        .btn-sm.active {
+            background: var(--gold);
+            color: #1a1a1a;
+            border-color: var(--gold);
+            font-weight: 700;
+        }
+
+        /* Config row */
+        .config-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .config-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        .config-group .label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .config-group .options {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        /* Stats pills */
+        .stats-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .stat-pill {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .stat-pill .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        .stat-pill .label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .stat-pill.best {
+            border-color: rgba(46, 204, 113, 0.4);
+        }
+        .stat-pill.best .value {
+            color: var(--positive);
+        }
+        .stat-pill.worst {
+            border-color: rgba(231, 76, 60, 0.4);
+        }
+        .stat-pill.worst .value {
+            color: var(--negative);
+        }
+        .stat-pill.avg .value {
+            color: var(--accent);
+        }
+
+        /* Layout: Heatmap + Timeline */
+        .two-col {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .col-heatmap {
+            flex: 0 0 320px;
+            min-width: 280px;
+        }
+        .col-timeline {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        /* Heatmap Calendar */
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+            text-align: center;
+        }
+        .heatmap-day-header {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            padding: 4px 0;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+            background: var(--bg);
+            color: var(--text-secondary);
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+            z-index: 2;
+        }
+        .heatmap-cell.empty {
+            cursor: default;
+            background: transparent;
+            color: transparent;
+        }
+        .heatmap-cell.active {
+            outline: 2px solid var(--gold);
+            outline-offset: -2px;
+        }
+        .heatmap-cell.today {
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+        .h-peak {
+            background: #1a6b3a;
+            color: #fff;
+        }
+        .h-good {
+            background: #27ae60;
+            color: #fff;
+        }
+        .h-neutral {
+            background: #2c3e50;
+            color: #ccc;
+        }
+        .h-warning {
+            background: #d35400;
+            color: #fff;
+        }
+        .h-danger {
+            background: #c0392b;
+            color: #fff;
+        }
+
+        .heatmap-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .heatmap-nav .month-label {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+        .heatmap-legend {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .heatmap-legend span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        /* Tooltip */
+        .heatmap-tooltip {
+            position: fixed;
+            background: var(--card);
+            border: 1px solid var(--gold);
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 0.8rem;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            min-width: 180px;
+            display: none;
+            line-height: 1.6;
+        }
+        .heatmap-tooltip .tt-date {
+            font-weight: 700;
+            color: var(--gold);
+            margin-bottom: 4px;
+        }
+        .heatmap-tooltip .tt-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Timeline */
+        .timeline-scroll {
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 6px;
+        }
+        .timeline-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .timeline-scroll::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 3px;
+            gap: 10px;
+            transition: background 0.2s;
+            cursor: default;
+        }
+        .timeline-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .timeline-item .time-badge {
+            font-weight: 700;
+            font-size: 0.85rem;
+            min-width: 48px;
+            color: var(--text);
+        }
+        .timeline-item .score-bar-wrap {
+            flex: 1;
+            height: 6px;
+            background: var(--bg);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .timeline-item .score-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+        .timeline-item .score-value {
+            font-weight: 600;
+            font-size: 0.8rem;
+            min-width: 50px;
+            text-align: right;
+        }
+        .timeline-item .zone-icon {
+            font-size: 1rem;
+            min-width: 20px;
+            text-align: center;
+        }
+        .timeline-item .micro-rec {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+            font-style: italic;
+        }
+
+        /* Chart */
+        .chart-wrapper {
+            position: relative;
+            height: 280px;
+            margin: 8px 0;
+        }
+        canvas {
+            width: 100% !important;
+        }
+
+        /* Recommendation */
+        .recommendation {
+            padding: 14px;
+            border-radius: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            line-height: 1.7;
+            font-size: 0.85rem;
+        }
+        .rec-time {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: 700;
+            margin: 2px 3px;
+            font-size: 0.75rem;
+        }
+        .rec-time.good {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--positive);
+        }
+        .rec-time.bad {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--negative);
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-overlay.show {
+            display: flex;
+        }
+        .loading-box {
+            background: var(--card);
+            border: 1px solid var(--gold);
+            border-radius: 14px;
+            padding: 30px;
+            text-align: center;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            padding: 10px;
+            letter-spacing: 1px;
+        }
+        .footer span {
+            margin: 0 6px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .two-col {
+                flex-direction: column;
+            }
+            .col-heatmap {
+                flex: unset;
+                min-width: unset;
+            }
+            .chart-wrapper {
+                height: 220px;
+            }
+            .stat-pill .value {
+                font-size: 1.1rem;
+            }
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            .timeline-item .micro-rec {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <h1>✦ Luck Window 24 Jam ✦</h1>
+            <p class="subtitle">Precision Engine v2.0 · Deterministic Heuristic Astrology Simulator</p>
+        </div>
+
+        <!-- Input Card -->
+        <div class="card">
+            <div class="card-title">📅 Parameter</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tanggal Lahir</label>
+                    <input type="date" id="birthDate" value="1993-12-15">
+                </div>
+                <div class="form-group">
+                    <label>Tanggal Target</label>
+                    <input type="date" id="targetDate" value="2026-05-02">
+                </div>
+                <div class="form-group" style="flex:0.6;min-width:110px">
+                    <label>Resolusi</label>
+                    <select id="intervalSelect">
+                        <option value="15">15 menit</option>
+                        <option value="30">30 menit</option>
+                        <option value="60" selected>60 menit</option>
+                        <option value="120">2 jam</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:0;min-width:auto">
+                    <button class="btn" onclick="runEngine()">🔮 Hitung</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Card -->
+        <div class="card">
+            <div class="card-title">⚙️ Konfigurasi Engine</div>
+            <div class="config-row">
+                <!-- Data Engine -->
+                <div class="config-group">
+                    <div class="label">🔭 Data Astronomi</div>
+                    <div class="options" id="dataEngineGroup">
+                        <button class="btn-sm active" data-engine="j2000">J2000</button>
+                        <button class="btn-sm" data-engine="j2026">J2026</button>
+                        <button class="btn-sm" data-engine="astroengine">Astro-Engine</button>
+                    </div>
+                </div>
+                <!-- Score Mode -->
+                <div class="config-group">
+                    <div class="label">🧮 Mode Skor</div>
+                    <div class="options" id="scoreModeGroup">
+                        <button class="btn-sm active" data-mode="L0">L0 Default</button>
+                        <button class="btn-sm" data-mode="L1">L1 Absolute</button>
+                    </div>
+                </div>
+                <!-- Orb Method -->
+                <div class="config-group">
+                    <div class="label">📐 Metode Orb</div>
+                    <div class="options" id="orbMethodGroup">
+                        <button class="btn-sm active" data-orb="linear">Linear</button>
+                        <button class="btn-sm" data-orb="cosine">Cosinus</button>
+                        <button class="btn-sm" data-orb="gaussian">Gaussian</button>
+                    </div>
+                </div>
+            </div>
+            <div id="astroStatus" style="font-size:0.7rem;color:var(--text-secondary);margin-top:6px;">
+                🔭 Astro-Engine: <span id="astroLoadStatus">belum dimuat</span>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row" id="statsRow">
+            <div class="stat-pill best">
+                <div class="value" id="bestTime">--</div>
+                <div class="label">Waktu Terbaik</div>
+            </div>
+            <div class="stat-pill best">
+                <div class="value" id="bestScore">--</div>
+                <div class="label">Skor Tertinggi</div>
+            </div>
+            <div class="stat-pill avg">
+                <div class="value" id="avgScore">--</div>
+                <div class="label">Rata-rata</div>
+            </div>
+            <div class="stat-pill worst">
+                <div class="value" id="worstScore">--</div>
+                <div class="label">Skor Terendah</div>
+            </div>
+            <div class="stat-pill worst">
+                <div class="value" id="worstTime">--</div>
+                <div class="label">Waktu Terburuk</div>
+            </div>
+        </div>
+
+        <!-- Two Column: Heatmap + Timeline -->
+        <div class="two-col">
+            <!-- Heatmap Calendar -->
+            <div class="card col-heatmap">
+                <div class="card-title">📅 Kalender Heatmap</div>
+                <div class="heatmap-nav">
+                    <button class="btn-sm" id="btnPrevMonth">◀</button>
+                    <span class="month-label" id="monthLabel">Mei 2026</span>
+                    <button class="btn-sm" id="btnNextMonth">▶</button>
+                </div>
+                <div class="heatmap-grid" id="heatmapGrid"></div>
+                <div class="heatmap-legend">
+                    <span><i class="legend-dot" style="background:#1a6b3a"></i> Peak</span>
+                    <span><i class="legend-dot" style="background:#27ae60"></i> Baik</span>
+                    <span><i class="legend-dot" style="background:#2c3e50"></i> Netral</span>
+                    <span><i class="legend-dot" style="background:#d35400"></i> Waspada</span>
+                    <span><i class="legend-dot" style="background:#c0392b"></i> Bahaya</span>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card col-timeline">
+                <div class="card-title">🕐 Timeline Detail — <span id="timelineDateLabel">2 Mei 2026</span></div>
+                <div class="timeline-scroll" id="timelineContainer">
+                    <p style="color:var(--text-secondary);text-align:center;padding:20px;">
+                        Menghitung...
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="card">
+            <div class="card-title">📈 Grafik Luck Window</div>
+            <div class="chart-wrapper">
+                <canvas id="luckChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recommendation Card -->
+        <div class="card" id="recommendationCard">
+            <div class="card-title">💡 Rekomendasi</div>
+            <div class="recommendation" id="recommendationText"></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <span>Deterministic Heuristic Astrology Simulator</span>
+            <span>·</span>
+            <span>For Entertainment Purposes Only</span>
+            <span>·</span>
+            <span>Not Real Astronomy</span>
+        </div>
+    </div>
+
+    <!-- Heatmap Tooltip -->
+    <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText">Memproses...</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // LUCK PRECISION ENGINE v2.0 — CORE
+        // ============================================================
+
+        // --- Epoch Constants ---
+        const J2000 = new Date(Date.UTC(2000, 0, 1, 12, 0, 0));
+        const J2026_EPOCH = new Date(Date.UTC(2026, 0, 1, 12, 0, 0));
+
+        // --- Planet Definitions (J2000 Base) ---
+        const PLANETS_J2000 = {
+            Sun: { speed: 1.000, base_angle: 280.0, weight: 5 },
+            Moon: { speed: 13.00, base_angle: 218.0, weight: 2 },
+            Mercury: { speed: 1.200, base_angle: 250.0, weight: 2 },
+            Venus: { speed: 1.100, base_angle: 181.0, weight: 4 },
+            Mars: { speed: 0.500, base_angle: 355.0, weight: -3 },
+            Jupiter: { speed: 0.080, base_angle: 34.0, weight: 6 },
+            Saturn: { speed: 0.030, base_angle: 50.0, weight: -4 },
+        };
+
+        // --- Planet Definitions (J2026 Base) — Pre-calculated with Astronomy-Engine ---
+        const PLANETS_J2026 = {
+            Sun: { speed: 1.000, base_angle: 280.46, weight: 5 },
+            Moon: { speed: 13.00, base_angle: 195.83, weight: 2 },
+            Mercury: { speed: 1.200, base_angle: 312.77, weight: 2 },
+            Venus: { speed: 1.100, base_angle: 295.41, weight: 4 },
+            Mars: { speed: 0.500, base_angle: 198.62, weight: -3 },
+            Jupiter: { speed: 0.080, base_angle: 90.15, weight: 6 },
+            Saturn: { speed: 0.030, base_angle: 342.08, weight: -4 },
+        };
+
+        // --- Aspect Definitions ---
+        const ASPECTS = [
+            { name: "conjunction", angle: 0, weight: 5, orb: 8 },
+            { name: "sextile", angle: 60, weight: 3, orb: 6 },
+            { name: "square", angle: 90, weight: -3, orb: 6 },
+            { name: "trine", angle: 120, weight: 4, orb: 6 },
+            { name: "opposition", angle: 180, weight: -4, orb: 8 },
+            { name: "semisextile", angle: 30, weight: 1, orb: 3 },
+            { name: "quincunx", angle: 150, weight: -2, orb: 4 },
+        ];
+
+        // --- State ---
+        let currentDataEngine = 'j2000';
+        let currentScoreMode = 'L0';
+        let currentOrbMethod = 'linear';
+        let astroEngineLoaded = false;
+        let currentTargetDate = new Date(Date.UTC(2026, 4, 2));
+        let currentBirthDate = new Date(Date.UTC(1993, 11, 15));
+        let heatmapMonth = 5; // Mei
+        let heatmapYear = 2026;
+        let activeHeatmapDay = 2;
+        let luckChart = null;
+        let currentTimelineResults = [];
+        let heatmapCache = {};
+
+        // --- User Timezone ---
+        const userZone = luxon.DateTime.now().zoneName;
+        const userOffset = luxon.DateTime.now().offset / 60;
+
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
+
+        function elapsedDays(date, epoch = J2000) {
+            return (date - epoch) / (1000 * 60 * 60 * 24);
+        }
+
+        function generateAngle(baseAngle, speed, days) {
+            return ((baseAngle + speed * days) % 360 + 360) % 360;
+        }
+
+        function angularDifference(a, b) {
+            const diff = Math.abs(a - b);
+            return diff > 180 ? 360 - diff : diff;
+        }
+
+        function orbFactor(diff, aspectAngle, maxOrb, method = 'linear') {
+            const deviation = Math.abs(diff - aspectAngle);
+            if (deviation > maxOrb) return 0;
+            switch (method) {
+                case 'cosine':
+                    return Math.cos((deviation / maxOrb) * (Math.PI / 2));
+                case 'gaussian':
+                    const sigma = maxOrb / 2.5;
+                    const raw = Math.exp(-(deviation * deviation) / (2 * sigma * sigma));
+                    return raw < 0.01 ? 0 : raw;
+                case 'linear':
+                default:
+                    return 1 - deviation / maxOrb;
+            }
+        }
+
+        function classifyScore(score) {
+            if (score >= 30) return { cat: 'PEAK POSITIVE', short: 'PEAK', icon: '🔥', rec: 'Lakukan sekarang!',
+                zone: 'peak' };
+            if (score >= 15) return { cat: 'STRONG POSITIVE', short: 'STRONG+', icon: '🔥', rec: 'Sangat baik',
+            zone: 'peak' };
+            if (score >= 5) return { cat: 'POSITIVE', short: 'POS', icon: '☀️', rec: 'Boleh dicoba', zone: 'good' };
+            if (score <= -30) return { cat: 'PEAK NEGATIVE', short: 'PEAK-', icon: '🛑', rec: 'Hindari!',
+            zone: 'danger' };
+            if (score <= -15) return { cat: 'STRONG NEGATIVE', short: 'STRONG-', icon: '🛑', rec: 'Tunda dulu',
+                zone: 'danger' };
+            if (score <= -5) return { cat: 'NEGATIVE', short: 'NEG', icon: '⚡', rec: 'Waspada', zone: 'warning' };
+            return { cat: 'NEUTRAL', short: 'NEU', icon: '😴', rec: 'Rutinitas aja', zone: 'neutral' };
+        }
+
+        function getZoneColor(zone) {
+            switch (zone) {
+                case 'peak':
+                    return '#1a6b3a';
+                case 'good':
+                    return '#27ae60';
+                case 'neutral':
+                    return '#2c3e50';
+                case 'warning':
+                    return '#d35400';
+                case 'danger':
+                    return '#c0392b';
+                default:
+                    return '#2c3e50';
+            }
+        }
+
+        function getHeatmapClass(avgScore) {
+            if (avgScore >= 15) return 'h-peak';
+            if (avgScore >= 5) return 'h-good';
+            if (avgScore > -5) return 'h-neutral';
+            if (avgScore > -15) return 'h-warning';
+            return 'h-danger';
+        }
+
+        function getMoonPhase(angle) {
+            if (angle < 22.5) return { emoji: '🌑', name: 'New Moon' };
+            if (angle < 67.5) return { emoji: '🌒', name: 'Waxing Crescent' };
+            if (angle < 112.5) return { emoji: '🌓', name: 'First Quarter' };
+            if (angle < 157.5) return { emoji: '🌔', name: 'Waxing Gibbous' };
+            if (angle < 202.5) return { emoji: '🌕', name: 'Full Moon' };
+            if (angle < 247.5) return { emoji: '🌖', name: 'Waning Gibbous' };
+            if (angle < 292.5) return { emoji: '🌗', name: 'Last Quarter' };
+            if (angle < 337.5) return { emoji: '🌘', name: 'Waning Crescent' };
+            return { emoji: '🌑', name: 'New Moon' };
+        }
+
+        // ============================================================
+        // DATA ENGINE FACTORY
+        // ============================================================
+
+        function getPlanetDefinitions(engine) {
+            switch (engine) {
+                case 'j2026':
+                    return PLANETS_J2026;
+                case 'astroengine':
+                    return PLANETS_J2000; // placeholder, akan di-override
+                default:
+                    return PLANETS_J2000;
+            }
+        }
+
+        function getEpoch(engine) {
+            switch (engine) {
+                case 'j2026':
+                    return J2026_EPOCH;
+                default:
+                    return J2000;
+            }
+        }
+
+        function generatePositions(date, engine = 'j2000') {
+            if (engine === 'astroengine' && astroEngineLoaded && window.Astronomy) {
+                return generatePositionsAstroEngine(date);
+            }
+            const planets = getPlanetDefinitions(engine);
+            const epoch = getEpoch(engine);
+            const days = elapsedDays(date, epoch);
+            const positions = {};
+            for (const [name, cfg] of Object.entries(planets)) {
+                positions[name] = {
+                    angle: generateAngle(cfg.base_angle, cfg.speed, days),
+                    weight: cfg.weight,
+                };
+            }
+            return positions;
+        }
+
+        function generatePositionsAstroEngine(date) {
+            const A = window.Astronomy;
+            const bodyMap = {
+                Sun: A.Body.Sun,
+                Moon: A.Body.Moon,
+                Mercury: A.Body.Mercury,
+                Venus: A.Body.Venus,
+                Mars: A.Body.Mars,
+                Jupiter: A.Body.Jupiter,
+                Saturn: A.Body.Saturn,
+            };
+            const positions = {};
+            for (const [name, body] of Object.entries(bodyMap)) {
+                try {
+                    const vec = A.GeoVector(body, date, true);
+                    const ecl = A.Ecliptic(vec);
+                    const weight = PLANETS_J2000[name].weight;
+                    // Check retrograde
+                    let isRetro = false;
+                    if (name !== 'Sun' && name !== 'Moon') {
+                        const futureDate = new Date(date.getTime() + 3600000);
+                        const vec2 = A.GeoVector(body, futureDate, true);
+                        const ecl2 = A.Ecliptic(vec2);
+                        let diff = ecl2.elon - ecl.elon;
+                        if (diff > 180) diff -= 360;
+                        if (diff < -180) diff += 360;
+                        isRetro = diff < 0;
+                    }
+                    positions[name] = {
+                        angle: ecl.elon,
+                        weight: weight,
+                        isRetrograde: isRetro,
+                    };
+                } catch (e) {
+                    positions[name] = { angle: 0, weight: PLANETS_J2000[name].weight, isRetrograde: false };
+                }
+            }
+            return positions;
+        }
+
+        // ============================================================
+        // SCORE CALCULATION
+        // ============================================================
+
+        function calculateScore(natal, transit, mode = 'L0', orbMethod = 'linear') {
+            let totalScore = 0;
+            const natalValues = Object.values(natal);
+            const transitValues = Object.values(transit);
+            for (const natalData of natalValues) {
+                for (const transitData of transitValues) {
+                    const diff = angularDifference(natalData.angle, transitData.angle);
+                    for (const aspect of ASPECTS) {
+                        if (Math.abs(diff - aspect.angle) <= aspect.orb) {
+                            const factor = orbFactor(diff, aspect.angle, aspect.orb, orbMethod);
+                            const planetWeight = mode === 'L1' ? Math.abs(transitData.weight) : transitData
+                                .weight;
+                            totalScore += planetWeight * aspect.weight * factor;
+                        }
+                    }
+                }
+            }
+            return Math.round(totalScore * 100) / 100;
+        }
+
+        // ============================================================
+        // LUCK CLOCK GENERATOR
+        // ============================================================
+
+        function generateLuckClock(birthDate, targetDate, intervalMinutes = 60, engine = 'j2000', mode = 'L0',
+            orbMethod = 'linear') {
+            const natal = generatePositions(birthDate, engine);
+            const results = [];
+            const totalMinutes = 24 * 60;
+            for (let minute = 0; minute < totalMinutes; minute += intervalMinutes) {
+                const current = new Date(targetDate);
+                current.setUTCHours(Math.floor(minute / 60), minute % 60, 0, 0);
+                const transit = generatePositions(current, engine);
+                const score = calculateScore(natal, transit, mode, orbMethod);
+                const classification = classifyScore(score);
+                // Convert UTC to local time
+                const localDT = luxon.DateTime.fromJSDate(current, { zone: 'utc' }).setZone(userZone);
+                const localHour = localDT.hour;
+                const localMinute = localDT.minute;
+                const hh = String(localHour).padStart(2, '0');
+                const mm = String(localMinute).padStart(2, '0');
+                results.push({
+                    time: `${hh}:${mm}`,
+                    utcHour: Math.floor(minute / 60),
+                    utcMinute: minute % 60,
+                    hour: localHour,
+                    minute: localMinute,
+                    score,
+                    category: classification.cat,
+                    catShort: classification.short,
+                    icon: classification.icon,
+                    rec: classification.rec,
+                    zone: classification.zone,
+                });
+            }
+            return results;
+        }
+
+        function summarize(results) {
+            const best = results.reduce((a, b) => a.score > b.score ? a : b);
+            const worst = results.reduce((a, b) => a.score < b.score ? a : b);
+            const average = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+            return {
+                best,
+                worst,
+                average: Math.round(average * 100) / 100,
+                positive: results.filter(r => r.score >= 5).length,
+                neutral: results.filter(r => r.score > -5 && r.score < 5).length,
+                negative: results.filter(r => r.score <= -5).length,
+            };
+        }
+
+        // ============================================================
+        // HEATMAP GENERATOR
+        // ============================================================
+
+        function generateMonthHeatmap(birthDate, year, month, engine, mode, orbMethod) {
+            const cacheKey = `${year}-${month}-${engine}-${mode}-${orbMethod}`;
+            if (heatmapCache[cacheKey]) return heatmapCache[cacheKey];
+            const daysInMonth = new Date(Date.UTC(year, month, 0)).getDate();
+            const heatmapData = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+                const targetDate = new Date(Date.UTC(year, month - 1, day));
+                const results = generateLuckClock(birthDate, targetDate, 60, engine, mode, orbMethod);
+                const stats = summarize(results);
+                const moonTransit = generatePositions(targetDate, engine);
+                const sunTransit = generatePositions(targetDate, engine);
+                let moonPhase = null;
+                if (moonTransit.Moon && sunTransit.Sun) {
+                    const moonSunDiff = angularDifference(moonTransit.Moon.angle, sunTransit.Sun.angle);
+                    moonPhase = getMoonPhase(moonSunDiff);
+                }
+                heatmapData.push({
+                    date: targetDate,
+                    day: day,
+                    weekday: new Date(Date.UTC(year, month - 1, day)).getUTCDay(),
+                    avgScore: stats.average,
+                    maxScore: stats.best.score,
+                    maxTime: stats.best.time,
+                    minScore: stats.worst.score,
+                    minTime: stats.worst.time,
+                    category: classifyScore(stats.average),
+                    positiveHours: stats.positive,
+                    neutralHours: stats.neutral,
+                    negativeHours: stats.negative,
+                    moonPhase: moonPhase,
+                });
+            }
+            heatmapCache[cacheKey] = heatmapData;
+            return heatmapData;
+        }
+
+        // ============================================================
+        // UI RENDERING
+        // ============================================================
+
+        function renderStats(stats, localDateLabel) {
+            document.getElementById('bestTime').textContent = stats.best.time;
+            document.getElementById('bestScore').textContent = stats.best.score.toFixed(2);
+            document.getElementById('avgScore').textContent = stats.average.toFixed(2);
+            document.getElementById('worstScore').textContent = stats.worst.score.toFixed(2);
+            document.getElementById('worstTime').textContent = stats.worst.time;
+            document.getElementById('timelineDateLabel').textContent = localDateLabel;
+        }
+
+        function renderTimeline(results) {
+            const container = document.getElementById('timelineContainer');
+            const maxAbsScore = Math.max(
+                Math.abs(Math.max(...results.map(r => r.score))),
+                Math.abs(Math.min(...results.map(r => r.score))),
+                1
+            );
+            let html = '';
+            results.forEach((r, i) => {
+                const barWidth = Math.abs(r.score) / maxAbsScore * 100;
+                const barColor = r.score >= 0 ?
+                    `linear-gradient(90deg, var(--positive), rgba(46,204,113,0.3))` :
+                    `linear-gradient(90deg, var(--negative), rgba(231,76,60,0.3))`;
+                const barAlign = r.score >= 0 ? 'left' : 'right';
+                const scoreColor = r.score >= 15 ? 'var(--positive)' :
+                    r.score >= 5 ? 'var(--positive)' :
+                    r.score > -5 ? 'var(--neutral)' :
+                    r.score > -15 ? '#e67e22' :
+                    'var(--negative)';
+                html += `
+                <div class="timeline-item">
+                    <span class="time-badge">${r.time}</span>
+                    <span class="zone-icon">${r.icon}</span>
+                    <div class="score-bar-wrap">
+                        <div class="score-bar" style="
+                            width: ${barWidth}%;
+                            background: ${barColor};
+                            float: ${barAlign};
+                        "></div>
+                    </div>
+                    <span class="score-value" style="color:${scoreColor}">${r.score.toFixed(2)}</span>
+                    <span class="micro-rec">${r.rec}</span>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderChart(results) {
+            const ctx = document.getElementById('luckChart').getContext('2d');
+            if (luckChart) luckChart.destroy();
+            const labels = results.map(r => r.time);
+            const scores = results.map(r => r.score);
+            const colors = scores.map(s => {
+                if (s >= 15) return 'rgba(46,204,113,0.9)';
+                if (s >= 5) return 'rgba(46,204,113,0.6)';
+                if (s > -5) return 'rgba(127,140,141,0.5)';
+                if (s > -15) return 'rgba(230,126,34,0.7)';
+                return 'rgba(231,76,60,0.9)';
+            });
+            luckChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Luck Score',
+                        data: scores,
+                        backgroundColor: colors,
+                        borderColor: colors.map(c => c.replace('0.6', '1').replace('0.9', '1')
+                            .replace('0.5', '0.8').replace('0.7', '1')),
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        borderSkipped: false,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(18,18,26,0.95)',
+                            borderColor: 'rgba(212,168,67,0.5)',
+                            borderWidth: 1,
+                            titleColor: '#d4a843',
+                            bodyColor: '#e0e0e0',
+                            padding: 12,
+                            callbacks: {
+                                label: function(ctx) {
+                                    const s = ctx.raw;
+                                    const cls = classifyScore(s);
+                                    return `Skor: ${s.toFixed(2)} — ${cls.cat}`;
+                                }
+                            }
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#8888aa', maxRotation: 45, font: { size: 9 },
+                                autoSkip: true, maxTicksLimit: 24 },
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                        },
+                        y: {
+                            ticks: { color: '#8888aa', callback: v => v.toFixed(0) },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                        },
+                    },
+                },
+                plugins: [{
+                    id: 'zeroLine',
+                    afterDraw: function(chart) {
+                        const yScale = chart.scales.y;
+                        const zeroY = yScale.getPixelForValue(0);
+                        const ctx = chart.ctx;
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(chart.chartArea.left, zeroY);
+                        ctx.lineTo(chart.chartArea.right, zeroY);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }],
+            });
+        }
+
+        function renderRecommendation(results, stats, localDateLabel) {
+            const goodWindows = results.filter(r => r.score >= 5);
+            const badWindows = results.filter(r => r.score <= -5);
+            const peakGood = results.filter(r => r.score >= 15);
+            const peakBad = results.filter(r => r.score <= -15);
+            // Detect retrograde
+            const retroPlanets = [];
+            if (currentDataEngine === 'astroengine' && astroEngineLoaded && results.length > 0) {
+                const transit = generatePositions(currentTargetDate, 'astroengine');
+                for (const [name, data] of Object.entries(transit)) {
+                    if (data.isRetrograde) retroPlanets.push(name);
+                }
+            }
+            let html = `<h3>📋 ${localDateLabel}</h3>`;
+            // Moon phase
+            if (results.length > 0 && currentDataEngine === 'astroengine' && astroEngineLoaded) {
+                const transit = generatePositions(currentTargetDate, 'astroengine');
+                if (transit.Sun && transit.Moon) {
+                    const diff = angularDifference(transit.Moon.angle, transit.Sun.angle);
+                    const phase = getMoonPhase(diff);
+                    html +=
+                        `<p>${phase.emoji} <strong>Fase Bulan:</strong> ${phase.name} (${Math.round(diff)}°)</p>`;
+                }
+            }
+            // Retrograde
+            if (retroPlanets.length > 0) {
+                html +=
+                    `<p>🔴 <strong>Retrograde:</strong> ${retroPlanets.map(p => {
+                        const emojiMap = { Mercury: '☿', Venus: '♀', Mars: '♂', Jupiter: '♃', Saturn: '♄' };
+                        return `${emojiMap[p] || ''} ${p}`;
+                    }).join(', ')}</p>`;
+            }
+            if (peakGood.length > 0) {
+                html +=
+                    '<p>⭐ <strong>Jendela Emas:</strong> Waktu sangat menguntungkan untuk keputusan penting.</p><p>🕐 ';
+                peakGood.forEach(r => {
+                    html +=
+                        `<span class="rec-time good">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                html += '</p>';
+            }
+            if (goodWindows.length > 0 && peakGood.length === 0) {
+                html += '<p>🌤️ <strong>Cukup Baik:</strong> Ada jendela positif untuk aktivitas.</p><p>🕐 ';
+                goodWindows.slice(0, 5).forEach(r => {
+                    html +=
+                        `<span class="rec-time good">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                if (goodWindows.length > 5) html += ` ...dan ${goodWindows.length - 5} lainnya`;
+                html += '</p>';
+            }
+            if (peakBad.length > 0) {
+                html +=
+                    '<p>⚠️ <strong>Waktu Kritis:</strong> Hindari keputusan besar atau aktivitas berisiko tinggi.</p><p>🕐 ';
+                peakBad.forEach(r => {
+                    html +=
+                        `<span class="rec-time bad">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                html += '</p>';
+            }
+            if (goodWindows.length === 0 && badWindows.length === 0) {
+                html +=
+                    '<p>😐 Hari ini cenderung <strong>netral</strong>. Cocok untuk rutinitas dan aktivitas biasa.</p>';
+            }
+            // Quick summary
+            html +=
+                `<p style="margin-top:10px;font-size:0.8rem;color:var(--text-secondary);">📝 <strong>Ringkasan:</strong> ${localDateLabel}. Rata-rata skor ${stats.average.toFixed(2)}. Waktu terbaik ${stats.best.time} (${stats.best.score.toFixed(2)}), terburuk ${stats.worst.time} (${stats.worst.score.toFixed(2)}). ${stats.positive} jam positif, ${stats.neutral} netral, ${stats.negative} negatif.</p>`;
+            html +=
+                '<p style="font-size:0.7rem;color:var(--text-secondary);">⚡ <em>Simulasi heuristik untuk hiburan. Bukan prediksi astrologi nyata.</em></p>';
+            document.getElementById('recommendationText').innerHTML = html;
+            document.getElementById('recommendationCard').style.display = 'block';
+        }
+
+        function renderHeatmap(heatmapData, activeDay) {
+            const grid = document.getElementById('heatmapGrid');
+            document.getElementById('monthLabel').textContent =
+                new Date(Date.UTC(heatmapYear, heatmapMonth - 1, 1)).toLocaleDateString('id-ID', { month: 'long',
+                    year: 'numeric' });
+            const firstDay = new Date(Date.UTC(heatmapYear, heatmapMonth - 1, 1)).getUTCDay();
+            const daysInMonth = heatmapData.length;
+            let html = '';
+            // Day headers
+            const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+            dayNames.forEach(d => {
+                html += `<div class="heatmap-day-header">${d}</div>`;
+            });
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                html += `<div class="heatmap-cell empty"></div>`;
+            }
+            // Day cells
+            const today = luxon.DateTime.now().setZone(userZone);
+            heatmapData.forEach((d, idx) => {
+                const cls = getHeatmapClass(d.avgScore);
+                const activeClass = (d.day === activeDay) ? ' active' : '';
+                const todayClass = (d.day === today.day && heatmapMonth === today.month && heatmapYear ===
+                    today.year) ? ' today' : '';
+                html +=
+                    `<div class="heatmap-cell ${cls}${activeClass}${todayClass}" 
+                         data-day="${d.day}" 
+                         data-avg="${d.avgScore.toFixed(1)}"
+                         data-max="${d.maxScore.toFixed(1)}"
+                         data-maxtime="${d.maxTime}"
+                         data-min="${d.minScore.toFixed(1)}"
+                         data-mintime="${d.minTime}"
+                         data-pos="${d.positiveHours}"
+                         data-neu="${d.neutralHours}"
+                         data-neg="${d.negativeHours}"
+                         data-moon="${d.moonPhase ? d.moonPhase.emoji + ' ' + d.moonPhase.name : ''}"
+                         onmouseenter="showTooltip(event, this)"
+                         onmouseleave="hideTooltip()"
+                         onclick="selectHeatmapDay(${d.day})">${d.day}</div>`;
+            });
+            grid.innerHTML = html;
+        }
+
+        // ============================================================
+        // TOOLTIP
+        // ============================================================
+
+        function showTooltip(event, el) {
+            const tooltip = document.getElementById('heatmapTooltip');
+            const day = el.dataset.day;
+            const avg = el.dataset.avg;
+            const max = el.dataset.max;
+            const maxtime = el.dataset.maxtime;
+            const min = el.dataset.min;
+            const mintime = el.dataset.mintime;
+            const pos = el.dataset.pos;
+            const neu = el.dataset.neu;
+            const neg = el.dataset.neg;
+            const moon = el.dataset.moon;
+            const dateLabel = new Date(Date.UTC(heatmapYear, heatmapMonth - 1, parseInt(day)))
+                .toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            tooltip.innerHTML = `
+                <div class="tt-date">📅 ${dateLabel}</div>
+                <div class="tt-row"><span>📊 Rata-rata:</span><strong>${avg}</strong></div>
+                <div class="tt-row"><span>🔥 Terbaik:</span><span>${maxtime} (${max})</span></div>
+                <div class="tt-row"><span>⚠️ Terburuk:</span><span>${mintime} (${min})</span></div>
+                <div class="tt-row"><span>☀️ Positif:</span><span>${pos} jam</span></div>
+                <div class="tt-row"><span>😴 Netral:</span><span>${neu} jam</span></div>
+                <div class="tt-row"><span>⚡ Negatif:</span><span>${neg} jam</span></div>
+                ${moon ? `<div class="tt-row"><span>🌙 Bulan:</span><span>${moon}</span></div>` : ''}
+                <div style="margin-top:6px;font-size:0.7rem;color:var(--gold);">Klik untuk lihat detail</div>
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.clientX + 15) + 'px';
+            tooltip.style.top = (event.clientY - 10) + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('heatmapTooltip').style.display = 'none';
+        }
+
+        function selectHeatmapDay(day) {
+            activeHeatmapDay = day;
+            currentTargetDate = new Date(Date.UTC(heatmapYear, heatmapMonth - 1, day));
+            document.getElementById('targetDate').value = currentTargetDate.toISOString().split('T')[0];
+            runEngine(false); // false = jangan regenerate heatmap
+        }
+
+        // ============================================================
+        // ASTRO ENGINE LOADER
+        // ============================================================
+
+        async function loadAstroEngine() {
+            if (astroEngineLoaded) return true;
+            if (window.Astronomy) {
+                astroEngineLoaded = true;
+                updateAstroStatus();
+                return true;
+            }
+            showLoading('Mendownload Astronomy-Engine (200KB)...');
+            try {
+                const script = document.createElement('script');
+                script.src =
+                    'https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js';
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                await new Promise(r => setTimeout(r, 300)); // wait for init
+                astroEngineLoaded = true;
+                updateAstroStatus();
+                hideLoading();
+                return true;
+            } catch (e) {
+                hideLoading();
+                alert('Gagal memuat Astronomy-Engine. Menggunakan J2000 sebagai fallback.');
+                document.querySelector('[data-engine="j2000"]').click();
+                return false;
+            }
+        }
+
+        function updateAstroStatus() {
+            const statusEl = document.getElementById('astroLoadStatus');
+            if (astroEngineLoaded) {
+                statusEl.textContent = '✅ dimuat';
+                statusEl.style.color = 'var(--positive)';
+            } else {
+                statusEl.textContent = 'belum dimuat';
+                statusEl.style.color = 'var(--text-secondary)';
+            }
+        }
+
+        function showLoading(msg) {
+            document.getElementById('loadingText').textContent = msg;
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        // ============================================================
+        // MAIN
+        // ============================================================
+
+        async function runEngine(regenerateHeatmap = true) {
+            const birthDateStr = document.getElementById('birthDate').value;
+            currentBirthDate = new Date(birthDateStr + 'T00:00:00Z');
+            if (isNaN(currentBirthDate.getTime())) { alert('Format tanggal lahir tidak valid.'); return; }
+            const intervalMin = parseInt(document.getElementById('intervalSelect').value);
+            // If astro engine selected, load it
+            if (currentDataEngine === 'astroengine' && !astroEngineLoaded) {
+                const loaded = await loadAstroEngine();
+                if (!loaded) {
+                    currentDataEngine = 'j2000';
+                    document.querySelectorAll('#dataEngineGroup .btn-sm').forEach(b => b.classList.remove(
+                        'active'));
+                    document.querySelector('[data-engine="j2000"]').classList.add('active');
+                }
+            }
+            // Calculate
+            currentTimelineResults = generateLuckClock(
+                currentBirthDate, currentTargetDate, intervalMin,
+                currentDataEngine, currentScoreMode, currentOrbMethod
+            );
+            const stats = summarize(currentTimelineResults);
+            const localDateLabel = luxon.DateTime.fromJSDate(currentTargetDate, { zone: 'utc' }).setZone(userZone)
+                .toLocaleString({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            // Render
+            renderStats(stats, localDateLabel);
+            renderTimeline(currentTimelineResults);
+            renderChart(currentTimelineResults);
+            renderRecommendation(currentTimelineResults, stats, localDateLabel);
+            // Regenerate heatmap if needed
+            if (regenerateHeatmap) {
+                const heatmapData = generateMonthHeatmap(
+                    currentBirthDate, heatmapYear, heatmapMonth,
+                    currentDataEngine, currentScoreMode, currentOrbMethod
+                );
+                renderHeatmap(heatmapData, activeHeatmapDay);
+            }
+            // Scroll
+            document.getElementById('statsRow').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ============================================================
+        // EVENT LISTENERS
+        // ============================================================
+
+        // Data Engine buttons
+        document.getElementById('dataEngineGroup').addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-sm')) {
+                this.querySelectorAll('.btn-sm').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                const engine = e.target.dataset.engine;
+                currentDataEngine = engine;
+                if (engine === 'astroengine' && !astroEngineLoaded) {
+                    document.getElementById('astroLoadStatus').textContent = '⏳ akan dimuat...';
+                    document.getElementById('astroLoadStatus').style.color = 'var(--warning)';
+                }
+                heatmapCache = {};
+                runEngine(true);
+            }
+        });
+
+        // Score Mode buttons
+        document.getElementById('scoreModeGroup').addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-sm')) {
+                this.querySelectorAll('.btn-sm').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentScoreMode = e.target.dataset.mode;
+                heatmapCache = {};
+                runEngine(true);
+            }
+        });
+
+        // Orb Method buttons
+        document.getElementById('orbMethodGroup').addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-sm')) {
+                this.querySelectorAll('.btn-sm').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentOrbMethod = e.target.dataset.orb;
+                heatmapCache = {};
+                runEngine(true);
+            }
+        });
+
+        // Heatmap navigation
+        document.getElementById('btnPrevMonth').addEventListener('click', function() {
+            if (heatmapMonth === 1) { heatmapMonth = 12;
+                heatmapYear--; } else { heatmapMonth--; }
+            activeHeatmapDay = 1;
+            heatmapCache = {};
+            runEngine(true);
+        });
+        document.getElementById('btnNextMonth').addEventListener('click', function() {
+            if (heatmapMonth === 12) { heatmapMonth = 1;
+                heatmapYear++; } else { heatmapMonth++; }
+            activeHeatmapDay = 1;
+            heatmapCache = {};
+            runEngine(true);
+        });
+
+        // Close tooltip on scroll
+        document.addEventListener('scroll', hideTooltip, { passive: true });
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('targetDate').value = '2026-05-02';
+            currentTargetDate = new Date(Date.UTC(2026, 4, 2));
+            heatmapMonth = 5;
+            heatmapYear = 2026;
+            activeHeatmapDay = 2;
+            updateAstroStatus();
+            runEngine(true);
+        });
+
+        console.log('🚀 Luck Window 24 Jam v2.0 — Precision Engine siap!');
+        console.log('🌍 Zona waktu:', userZone, '(UTC' + (userOffset >= 0 ? '+' : '') + userOffset + ')');
+        console.log('📐 Konfigurasi:', '3 Data Engine × 2 Score Mode × 3 Orb Method = 18 kombinasi');
+        console.log('📅 Fitur:', 'Heatmap kalender + Timeline interaktif + Strength meter');
+    </script>
+</body>
+</html>

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luck Window 24 Jam — Precision Engine</title>
+    
+    <!-- Chart.js untuk grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --border: #1e1e30;
+            --text: #e0e0e0;
+            --text-secondary: #8888aa;
+            --gold: #d4a843;
+            --gold-glow: rgba(212, 168, 67, 0.3);
+            --positive: #2ecc71;
+            --positive-glow: rgba(46, 204, 113, 0.4);
+            --negative: #e74c3c;
+            --negative-glow: rgba(231, 76, 60, 0.4);
+            --neutral: #7f8c8d;
+            --accent: #6c5ce7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            background-image:
+                radial-gradient(ellipse at 20% 20%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(212, 168, 67, 0.05) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--gold), #f0d78c, var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 4px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Card */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px var(--gold-glow);
+        }
+        .btn {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, var(--gold), #c4963a);
+            color: #1a1a1a;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px var(--gold-glow);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Stats pills */
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .stat-pill {
+            flex: 1;
+            min-width: 100px;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .stat-pill .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        .stat-pill .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .stat-pill.best {
+            border-color: rgba(46, 204, 113, 0.4);
+        }
+        .stat-pill.best .value {
+            color: var(--positive);
+        }
+        .stat-pill.worst {
+            border-color: rgba(231, 76, 60, 0.4);
+        }
+        .stat-pill.worst .value {
+            color: var(--negative);
+        }
+        .stat-pill.avg .value {
+            color: var(--accent);
+        }
+
+        /* Chart container */
+        .chart-wrapper {
+            position: relative;
+            height: 350px;
+            margin: 10px 0;
+        }
+        canvas {
+            width: 100% !important;
+        }
+
+        /* Timeline detail */
+        .timeline-scroll {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .timeline-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .timeline-scroll::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            gap: 12px;
+            transition: background 0.2s;
+            cursor: default;
+        }
+        .timeline-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .timeline-item .time-badge {
+            font-weight: 700;
+            font-size: 0.9rem;
+            min-width: 50px;
+            color: var(--text);
+        }
+        .timeline-item .score-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .timeline-item .score-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .timeline-item .score-value {
+            font-weight: 600;
+            font-size: 0.85rem;
+            min-width: 55px;
+            text-align: right;
+        }
+        .timeline-item .category-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            min-width: 90px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .cat-PEAK {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+        .cat-STRONG_POS {
+            background: rgba(46, 204, 113, 0.12);
+            color: #27ae60;
+        }
+        .cat-POS {
+            background: rgba(46, 204, 113, 0.06);
+            color: #1abc9c;
+        }
+        .cat-NEUTRAL {
+            background: rgba(127, 140, 141, 0.15);
+            color: #95a5a6;
+        }
+        .cat-NEG {
+            background: rgba(231, 76, 60, 0.06);
+            color: #e74c3c;
+        }
+        .cat-STRONG_NEG {
+            background: rgba(231, 76, 60, 0.12);
+            color: #c0392b;
+        }
+        .cat-PEAK_NEG {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        /* Recommendation box */
+        .recommendation {
+            padding: 20px;
+            border-radius: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            line-height: 1.7;
+        }
+        .recommendation h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        .rec-time {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            margin: 2px 4px;
+            font-size: 0.85rem;
+        }
+        .rec-time.good {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--positive);
+        }
+        .rec-time.bad {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--negative);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            padding: 10px;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            .form-row {
+                flex-direction: column;
+            }
+            .chart-wrapper {
+                height: 250px;
+            }
+            .stat-pill .value {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <h1>✦ Luck Window 24 Jam ✦</h1>
+            <p class="subtitle">Deterministic Precision Engine</p>
+        </div>
+
+        <!-- Input Card -->
+        <div class="card">
+            <div class="card-title">📅 Parameter</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tanggal Lahir</label>
+                    <input type="date" id="birthDate" value="1993-12-15">
+                </div>
+                <div class="form-group">
+                    <label>Tanggal Target</label>
+                    <input type="date" id="targetDate" value="2026-05-02">
+                </div>
+                <div class="form-group" style="flex:0.6;min-width:120px">
+                    <label>Resolusi</label>
+                    <select id="intervalSelect">
+                        <option value="15">15 menit (96 titik)</option>
+                        <option value="30">30 menit (48 titik)</option>
+                        <option value="60" selected>60 menit (24 titik)</option>
+                        <option value="120">2 jam (12 titik)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:0;min-width:auto">
+                    <button class="btn" onclick="runEngine()">🔮 Hitung</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row" id="statsRow">
+            <div class="stat-pill best">
+                <div class="value" id="bestTime">--</div>
+                <div class="label">Waktu Terbaik</div>
+            </div>
+            <div class="stat-pill best">
+                <div class="value" id="bestScore">--</div>
+                <div class="label">Skor Tertinggi</div>
+            </div>
+            <div class="stat-pill avg">
+                <div class="value" id="avgScore">--</div>
+                <div class="label">Rata-rata</div>
+            </div>
+            <div class="stat-pill worst">
+                <div class="value" id="worstScore">--</div>
+                <div class="label">Skor Terendah</div>
+            </div>
+            <div class="stat-pill worst">
+                <div class="value" id="worstTime">--</div>
+                <div class="label">Waktu Terburuk</div>
+            </div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="card">
+            <div class="card-title">📈 Grafik Luck Window</div>
+            <div class="chart-wrapper">
+                <canvas id="luckChart"></canvas>
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+                <span style="color:var(--positive);font-size:0.75rem">● Positif</span>
+                <span style="color:var(--neutral);font-size:0.75rem">● Netral</span>
+                <span style="color:var(--negative);font-size:0.75rem">● Negatif</span>
+            </div>
+        </div>
+
+        <!-- Timeline Detail Card -->
+        <div class="card">
+            <div class="card-title">🕐 Timeline Detail</div>
+            <div class="timeline-scroll" id="timelineContainer">
+                <p style="color:var(--text-secondary);text-align:center;padding:20px;">
+                    Silakan isi parameter dan klik <strong>Hitung</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Recommendation Card -->
+        <div class="card" id="recommendationCard" style="display:none;">
+            <div class="card-title">💡 Rekomendasi Aktivitas</div>
+            <div class="recommendation" id="recommendationText"></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            Heuristic Astrology Simulator · Deterministic · For Entertainment Only
+        </div>
+
+    </div>
+
+    <script>
+        // ============================================================
+        // LUCK PRECISION ENGINE — Core Logic
+        // ============================================================
+
+        const J2000 = new Date(Date.UTC(2000, 0, 1, 12, 0, 0));
+
+        const PLANETS = {
+            Sun: { speed: 1.000, base_angle: 280.0, weight: 5 },
+            Moon: { speed: 13.00, base_angle: 218.0, weight: 2 },
+            Mercury: { speed: 1.200, base_angle: 250.0, weight: 2 },
+            Venus: { speed: 1.100, base_angle: 181.0, weight: 4 },
+            Mars: { speed: 0.500, base_angle: 355.0, weight: -3 },
+            Jupiter: { speed: 0.080, base_angle: 34.0, weight: 6 },
+            Saturn: { speed: 0.030, base_angle: 50.0, weight: -4 },
+        };
+
+        const ASPECTS = [
+            { name: "conjunction", angle: 0, weight: 5, orb: 8 },
+            { name: "sextile", angle: 60, weight: 3, orb: 6 },
+            { name: "square", angle: 90, weight: -3, orb: 6 },
+            { name: "trine", angle: 120, weight: 4, orb: 6 },
+            { name: "opposition", angle: 180, weight: -4, orb: 8 },
+        ];
+
+        function elapsedDays(date) {
+            return (date - J2000) / (1000 * 60 * 60 * 24);
+        }
+
+        function generateAngle(baseAngle, speed, days) {
+            return ((baseAngle + speed * days) % 360 + 360) % 360;
+        }
+
+        function angularDifference(a, b) {
+            const diff = Math.abs(a - b);
+            return diff > 180 ? 360 - diff : diff;
+        }
+
+        function orbFactor(diff, aspectAngle, maxOrb) {
+            return Math.max(0, 1 - Math.abs(diff - aspectAngle) / maxOrb);
+        }
+
+        function classifyScore(score) {
+            if (score >= 30) return { cat: 'PEAK POSITIVE', short: 'PEAK_POS' };
+            if (score >= 15) return { cat: 'STRONG POSITIVE', short: 'STRONG_POS' };
+            if (score >= 5) return { cat: 'POSITIVE', short: 'POS' };
+            if (score <= -30) return { cat: 'PEAK NEGATIVE', short: 'PEAK_NEG' };
+            if (score <= -15) return { cat: 'STRONG NEGATIVE', short: 'STRONG_NEG' };
+            if (score <= -5) return { cat: 'NEGATIVE', short: 'NEG' };
+            return { cat: 'NEUTRAL', short: 'NEUTRAL' };
+        }
+
+        function generatePositions(date) {
+            const days = elapsedDays(date);
+            const positions = {};
+            for (const [name, cfg] of Object.entries(PLANETS)) {
+                positions[name] = {
+                    angle: generateAngle(cfg.base_angle, cfg.speed, days),
+                    weight: cfg.weight,
+                };
+            }
+            return positions;
+        }
+
+        function calculateScore(natal, transit) {
+            let totalScore = 0;
+            const natalValues = Object.values(natal);
+            const transitValues = Object.values(transit);
+
+            for (const natalData of natalValues) {
+                for (const transitData of transitValues) {
+                    const diff = angularDifference(natalData.angle, transitData.angle);
+                    for (const aspect of ASPECTS) {
+                        if (Math.abs(diff - aspect.angle) <= aspect.orb) {
+                            const factor = orbFactor(diff, aspect.angle, aspect.orb);
+                            totalScore += transitData.weight * aspect.weight * factor;
+                        }
+                    }
+                }
+            }
+            return Math.round(totalScore * 100) / 100;
+        }
+
+        function generateLuckClock(birthDate, targetDate, intervalMinutes = 60) {
+            const natal = generatePositions(birthDate);
+            const results = [];
+            const totalMinutes = 24 * 60;
+
+            for (let minute = 0; minute < totalMinutes; minute += intervalMinutes) {
+                const current = new Date(targetDate);
+                current.setUTCHours(Math.floor(minute / 60), minute % 60, 0, 0);
+
+                const transit = generatePositions(current);
+                const score = calculateScore(natal, transit);
+                const classification = classifyScore(score);
+
+                const hh = String(Math.floor(minute / 60)).padStart(2, '0');
+                const mm = String(minute % 60).padStart(2, '0');
+
+                results.push({
+                    time: `${hh}:${mm}`,
+                    hour: Math.floor(minute / 60),
+                    minute: minute % 60,
+                    score,
+                    category: classification.cat,
+                    catShort: classification.short,
+                });
+            }
+            return results;
+        }
+
+        function summarize(results) {
+            const best = results.reduce((a, b) => a.score > b.score ? a : b);
+            const worst = results.reduce((a, b) => a.score < b.score ? a : b);
+            const average = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+
+            return {
+                best,
+                worst,
+                average: Math.round(average * 100) / 100,
+                positive: results.filter(r => r.score >= 5).length,
+                neutral: results.filter(r => r.score > -5 && r.score < 5).length,
+                negative: results.filter(r => r.score <= -5).length,
+            };
+        }
+
+        // ============================================================
+        // CHART & UI RENDERING
+        // ============================================================
+
+        let luckChart = null;
+
+        function getBarColor(score) {
+            if (score >= 15) return 'rgba(46, 204, 113, 0.9)';
+            if (score >= 5) return 'rgba(46, 204, 113, 0.6)';
+            if (score > -5) return 'rgba(127, 140, 141, 0.6)';
+            if (score > -15) return 'rgba(231, 76, 60, 0.6)';
+            return 'rgba(231, 76, 60, 0.9)';
+        }
+
+        function getCategoryClass(catShort) {
+            const map = {
+                'PEAK_POS': 'cat-PEAK',
+                'STRONG_POS': 'cat-STRONG_POS',
+                'POS': 'cat-POS',
+                'NEUTRAL': 'cat-NEUTRAL',
+                'NEG': 'cat-NEG',
+                'STRONG_NEG': 'cat-STRONG_NEG',
+                'PEAK_NEG': 'cat-PEAK_NEG',
+            };
+            return map[catShort] || 'cat-NEUTRAL';
+        }
+
+        function renderChart(results) {
+            const ctx = document.getElementById('luckChart').getContext('2d');
+
+            if (luckChart) {
+                luckChart.destroy();
+            }
+
+            // Area background: hijau di atas, merah di bawah
+            const labels = results.map(r => r.time);
+            const scores = results.map(r => r.score);
+            const colors = scores.map(s => getBarColor(s));
+
+            luckChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Luck Score',
+                        data: scores,
+                        backgroundColor: colors,
+                        borderColor: colors.map(c => c.replace('0.6', '1').replace('0.9',
+                            '1')),
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(18,18,26,0.95)',
+                            borderColor: 'rgba(212,168,67,0.5)',
+                            borderWidth: 1,
+                            titleColor: '#d4a843',
+                            bodyColor: '#e0e0e0',
+                            padding: 12,
+                            callbacks: {
+                                label: function(ctx) {
+                                    const score = ctx.raw;
+                                    const cls = classifyScore(score);
+                                    return `Skor: ${score.toFixed(2)} — ${cls.cat}`;
+                                }
+                            }
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#8888aa',
+                                maxRotation: 45,
+                                font: { size: 10 },
+                                autoSkip: true,
+                                maxTicksLimit: 24,
+                            },
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                        },
+                        y: {
+                            ticks: {
+                                color: '#8888aa',
+                                callback: v => v.toFixed(0),
+                            },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            // Garis nol tegas
+                        },
+                    },
+                },
+                plugins: [{
+                    id: 'zeroLine',
+                    afterDraw: function(chart) {
+                        const yScale = chart.scales.y;
+                        const zeroY = yScale.getPixelForValue(0);
+                        const ctx = chart.ctx;
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(chart.chartArea.left, zeroY);
+                        ctx.lineTo(chart.chartArea.right, zeroY);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }],
+            });
+        }
+
+        function renderTimeline(results) {
+            const container = document.getElementById('timelineContainer');
+            const maxAbsScore = Math.max(Math.abs(Math.max(...results.map(r => r.score))), Math.abs(Math
+                .min(...results.map(r => r.score))), 1);
+
+            let html = '';
+            results.forEach((r, i) => {
+                const barWidth = Math.abs(r.score) / maxAbsScore * 100;
+                const barColor = r.score >= 0 ?
+                    `linear-gradient(90deg, var(--positive), rgba(46,204,113,0.3))` :
+                    `linear-gradient(90deg, var(--negative), rgba(231,76,60,0.3))`;
+                const barAlign = r.score >= 0 ? 'left' : 'right';
+                const catClass = getCategoryClass(r.catShort);
+                const scoreColor = r.score >= 0 ? 'var(--positive)' : r.score < 0 ? 'var(--negative)' :
+                    'var(--neutral)';
+
+                html += `
+                <div class="timeline-item">
+                    <span class="time-badge">${r.time}</span>
+                    <div class="score-bar-wrap">
+                        <div class="score-bar" style="
+                            width: ${barWidth}%;
+                            background: ${barColor};
+                            float: ${barAlign};
+                        "></div>
+                    </div>
+                    <span class="score-value" style="color:${scoreColor}">${r.score.toFixed(2)}</span>
+                    <span class="category-badge ${catClass}">${r.catShort.replace('_',' ')}</span>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderStats(stats) {
+            document.getElementById('bestTime').textContent = stats.best.time;
+            document.getElementById('bestScore').textContent = stats.best.score.toFixed(2);
+            document.getElementById('avgScore').textContent = stats.average.toFixed(2);
+            document.getElementById('worstScore').textContent = stats.worst.score.toFixed(2);
+            document.getElementById('worstTime').textContent = stats.worst.time;
+        }
+
+        function generateRecommendation(results) {
+            const goodWindows = results.filter(r => r.score >= 5);
+            const badWindows = results.filter(r => r.score <= -5);
+            const peakGood = results.filter(r => r.score >= 15);
+            const peakBad = results.filter(r => r.score <= -15);
+
+            let html = '<h3>📋 Ringkasan Hari Ini</h3>';
+
+            if (peakGood.length > 0) {
+                html +=
+                    '<p>⭐ <strong>Jendela Emas:</strong> Waktu sangat menguntungkan untuk keputusan penting, presentasi, atau negosiasi.</p>';
+                html += '<p>🕐 ';
+                peakGood.forEach(r => {
+                    html +=
+                        `<span class="rec-time good">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                html += '</p>';
+            }
+
+            if (goodWindows.length > 0 && peakGood.length === 0) {
+                html += '<p>🌤️ <strong>Cukup Baik:</strong> Ada beberapa jendela positif untuk aktivitas.</p>';
+                html += '<p>🕐 ';
+                goodWindows.slice(0, 5).forEach(r => {
+                    html +=
+                        `<span class="rec-time good">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                if (goodWindows.length > 5) html += ` ...dan ${goodWindows.length - 5} lainnya`;
+                html += '</p>';
+            }
+
+            if (peakBad.length > 0) {
+                html +=
+                    '<p>⚠️ <strong>Waktu Kritis:</strong> Sebaiknya hindari keputusan besar atau aktivitas berisiko tinggi.</p>';
+                html += '<p>🕐 ';
+                peakBad.forEach(r => {
+                    html +=
+                        `<span class="rec-time bad">${r.time} (${r.score.toFixed(1)})</span> `;
+                });
+                html += '</p>';
+            }
+
+            if (goodWindows.length === 0 && badWindows.length === 0) {
+                html +=
+                    '<p>😐 Hari ini cenderung <strong>netral</strong>. Cocok untuk rutinitas dan aktivitas biasa tanpa ekspektasi tinggi.</p>';
+            }
+
+            html +=
+                '<p style="margin-top:12px;font-size:0.8rem;color:var(--text-secondary);">⚡ <em>Catatan: Ini adalah simulasi heuristik deterministik untuk hiburan. Bukan prediksi astrologi nyata.</em></p>';
+
+            document.getElementById('recommendationText').innerHTML = html;
+            document.getElementById('recommendationCard').style.display = 'block';
+        }
+
+        // ============================================================
+        // MAIN ENTRY POINT
+        // ============================================================
+
+        function runEngine() {
+            const birthDateStr = document.getElementById('birthDate').value;
+            const targetDateStr = document.getElementById('targetDate').value;
+            const intervalMin = parseInt(document.getElementById('intervalSelect').value);
+
+            if (!birthDateStr || !targetDateStr) {
+                alert('Mohon isi kedua tanggal terlebih dahulu.');
+                return;
+            }
+
+            const birthDate = new Date(birthDateStr + 'T00:00:00Z');
+            const targetDate = new Date(targetDateStr + 'T00:00:00Z');
+
+            if (isNaN(birthDate.getTime()) || isNaN(targetDate.getTime())) {
+                alert('Format tanggal tidak valid.');
+                return;
+            }
+
+            // Jalankan engine
+            const results = generateLuckClock(birthDate, targetDate, intervalMin);
+            const stats = summarize(results);
+
+            // Render semua
+            renderStats(stats);
+            renderChart(results);
+            renderTimeline(results);
+            generateRecommendation(results);
+
+            // Scroll ke hasil
+            document.getElementById('statsRow').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ============================================================
+        // AUTO-RUN ON LOAD
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            runEngine();
+        });
+    </script>
+
+</body>
+</html>

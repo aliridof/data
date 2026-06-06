@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronav Matrix V2.0 — Full ZEN/NAD Aspect Engine</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #ffffff; --bg-surface: #f5f5f5; --bg-border: #e5e5e5;
+            --text-primary: #000000; --text-secondary: #707072;
+            --accent-red: #ff3b30;
+            --cell-green: #e8f5e9; --border-green: #66bb6a;
+            --cell-blue:  #e3f2fd; --border-blue:  #42a5f5;
+            --cell-gray:  #f5f5f5; --border-gray:  #bdbdbd;
+            --cell-yellow:#fffde7; --border-yellow:#ffee58;
+            --cell-red:   #ffebee; --border-red:   #ef5350;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: var(--bg-main); color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── HEADER ── */
+        #app-header {
+            position: sticky; top: 0; z-index: 1000;
+            background: var(--bg-main); border-bottom: 2px solid var(--text-primary);
+            padding: 12px 24px; display: flex; align-items: center;
+            justify-content: space-between; flex-wrap: wrap; gap: 12px;
+        }
+        .hdr-brand h1 { font-size: 1.35rem; font-weight: 900; text-transform: uppercase; }
+        .hdr-brand .tagline {
+            font-size: 0.63rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 1.2px; color: var(--text-secondary); margin-top: 3px;
+        }
+        .hdr-live {
+            display: flex; align-items: center; gap: 8px;
+            font-family: 'Courier New', monospace; font-size: 0.78rem; font-weight: 700;
+        }
+        .live-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent-red); animation: pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── LAYOUT ── */
+        #app-body {
+            display: grid; grid-template-columns: 1fr;
+            max-width: 1820px; margin: 0 auto;
+        }
+        @media(min-width:1280px) { #app-body { grid-template-columns: 1fr 400px; } }
+        #left-panel  { padding: 24px; display: flex; flex-direction: column; gap: 28px; border-right: 1px solid var(--bg-border); }
+        #right-panel { display: flex; flex-direction: column; }
+
+        /* ── LABELS ── */
+        .section-label {
+            font-size: 0.63rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--text-secondary);
+            border-left: 3px solid var(--text-primary);
+            padding-left: 8px; margin-bottom: 10px;
+        }
+
+        /* ── CONTROLS ── */
+        #control-panel {
+            background: var(--bg-surface); border: 1px solid var(--bg-border);
+            padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+        }
+        .ctrl-grp { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 148px; }
+        .ctrl-grp label {
+            font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1px; color: var(--text-secondary);
+        }
+        .ctrl-input {
+            height: 32px; border: 1px solid var(--text-primary);
+            background: var(--bg-main); color: var(--text-primary);
+            font-family: 'Courier New', monospace; font-size: 0.8rem;
+            padding: 0 10px; outline: none; width: 100%;
+        }
+        .ctrl-input:focus { border-color: var(--accent-red); }
+        .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+        .btn {
+            height: 32px; padding: 0 13px;
+            border: 1px solid var(--text-primary);
+            background: var(--bg-main); color: var(--text-primary);
+            font-size: 0.67rem; font-weight: 800; text-transform: uppercase;
+            cursor: pointer; transition: all 0.12s;
+            display: inline-flex; align-items: center;
+        }
+        .btn:hover  { background: var(--text-primary); color: var(--bg-main); }
+        .btn.active { background: var(--accent-red); color:#fff; border-color:var(--accent-red); }
+
+        /* ── GEO ── */
+        #geo-wrap { position: relative; }
+        #geo-results {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
+            background: var(--bg-main); border: 1px solid var(--text-primary);
+            border-top: none; max-height: 180px; overflow-y: auto; display: none;
+        }
+        .geo-item { padding: 7px 12px; cursor: pointer; font-size: 0.74rem; border-bottom: 1px solid var(--bg-border); }
+        .geo-item:hover { background: var(--bg-surface); }
+
+        /* ── MAP ── */
+        #map-container { border: 1px solid var(--text-primary); height: 250px; position: relative; }
+        #map { width: 100%; height: 100%; }
+        .map-badge {
+            position: absolute; bottom: 8px; left: 8px; z-index: 500;
+            background: rgba(0,0,0,0.82); color: #fff;
+            font-family: 'Courier New', monospace; font-size: 0.67rem; font-weight: 700;
+            padding: 4px 10px; pointer-events: none;
+        }
+
+        /* ── TELEMETRY ── */
+        .tele-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--bg-border); }
+        .tele-cell { background: var(--bg-main); padding: 9px 12px; }
+        .tc-label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 3px; }
+        .tc-val   { font-family: 'Courier New', monospace; font-size: 0.8rem; font-weight: 700; }
+
+        /* ── MATRIX ── */
+        .matrix-section { border-top: 2px solid var(--text-primary); padding-top: 18px; }
+        .mx-title  { font-size: 0.78rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        .mx-legend { font-size: 0.63rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; line-height: 1.7; }
+        .mx-scroll { width: 100%; overflow-x: auto; }
+
+        table.mx {
+            min-width: 1000px; width: 100%; border-collapse: collapse;
+            text-align: center; font-family: 'Courier New', monospace; font-size: 0.66rem;
+        }
+        table.mx th, table.mx td {
+            border: 1px solid var(--bg-border); padding: 2px 1px; height: 40px;
+        }
+        table.mx th {
+            background: var(--bg-main); font-weight: 800;
+            border-bottom: 2px solid var(--text-primary); font-size: 0.68rem;
+        }
+        table.mx .rh {
+            text-align: left; padding-left: 8px; font-weight: 800;
+            background: var(--bg-main); border-right: 2px solid var(--text-primary);
+            white-space: nowrap;
+        }
+        table.mx .diag  { background: #000; }
+        table.mx .inact { color: #ccc; background: #fafafa; font-size: 0.75rem; }
+
+        /* ── ZEN / NAD header col highlight ── */
+        .th-zen { background: #fff5f5 !important; color: var(--accent-red) !important; border-bottom: 2px solid var(--accent-red) !important; }
+        .th-nad { background: #f5f5f5 !important; color: #555 !important; border-bottom: 2px solid #555 !important; }
+        .td-zen-col { background: #fff8f8; }
+        .td-nad-col { background: #f8f8f8; }
+
+        .c-green  { background: var(--cell-green);  border: 1px solid var(--border-green)  !important; }
+        .c-blue   { background: var(--cell-blue);   border: 1px solid var(--border-blue)   !important; }
+        .c-gray   { background: var(--cell-gray);   border: 1px solid var(--border-gray)   !important; }
+        .c-yellow { background: var(--cell-yellow); border: 1px solid var(--border-yellow) !important; }
+        .c-red    { background: var(--cell-red);    border: 1px solid var(--border-red)    !important; }
+        .asp-val  { display: block; font-size: 0.72rem; font-weight: 800; color: #000; }
+        .asp-sym  { font-size: 0.62rem; color: #555; }
+
+        /* ── SCORES ── */
+        .score-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+        @media(max-width:600px){ .score-layout { grid-template-columns: 1fr; } }
+        .score-card { border: 1px solid var(--text-primary); padding: 14px; }
+        .score-card h4 {
+            font-size: 0.68rem; font-weight: 900; text-transform: uppercase;
+            letter-spacing: 1.5px; margin-bottom: 10px;
+            border-bottom: 1px solid var(--bg-border); padding-bottom: 6px;
+        }
+        .score-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 0; border-bottom: 1px solid var(--bg-border);
+            font-family: 'Courier New', monospace; font-size: 0.8rem;
+        }
+        .sr-label { font-weight: 800; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.68rem; }
+
+        /* ── RIGHT PANEL ── */
+        .rp-section { padding: 16px; border-bottom: 1px solid var(--bg-border); }
+        .rp-title {
+            font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1.5px; margin-bottom: 10px;
+            padding-bottom: 6px; border-bottom: 1px solid var(--bg-border);
+        }
+        .layer-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 7px 0; border-bottom: 1px solid var(--bg-border); font-size: 0.75rem;
+        }
+        .sw { position:relative; display:inline-block; width:32px; height:16px; }
+        .sw input { opacity:0; width:0; height:0; }
+        .sw-s { position:absolute; inset:0; background:var(--bg-border); cursor:pointer; transition:.15s; }
+        .sw-s::before { content:""; position:absolute; width:10px; height:10px; left:3px; bottom:3px; background:var(--text-primary); transition:.15s; }
+        input:checked + .sw-s { background:var(--text-primary); }
+        input:checked + .sw-s::before { transform:translateX(16px); background:#fff; }
+
+        /* ── MONITOR ── */
+        .pm-row {
+            display: grid; grid-template-columns: 10px 52px 1fr auto;
+            align-items: center; gap: 8px; padding: 8px 0;
+            border-bottom: 1px solid var(--bg-border);
+        }
+        .pm-dot  { width:8px; height:8px; border-radius:50%; }
+        .pm-name { font-weight:800; font-size:0.72rem; text-transform:uppercase; }
+        .pm-data { font-family:'Courier New',monospace; font-size:0.66rem; color:var(--text-secondary); line-height:1.5; }
+        .pm-badge{ font-size:0.57rem; font-weight:800; padding:2px 5px; border:1px solid currentColor; text-transform:uppercase; }
+        .badge-zen { color:var(--accent-red); } .badge-nad { color:#888; }
+
+        /* ── CANVAS ── */
+        #vec-canvas { width:100%; display:block; border:1px solid var(--bg-border); background:#fafafa; }
+
+        /* ── DEBUG ── */
+        #debug-panel {
+            background:#000; color:#0f0;
+            font-family:'Courier New',monospace; font-size:0.65rem;
+            padding:12px; line-height:1.7; max-height:200px; overflow-y:auto;
+        }
+        .dbg-title { color:#ff0; font-weight:700; }
+        .dbg-hit   { color:#0ff; }
+        .dbg-miss  { color:#666; }
+        .dbg-inact { color:#f55; }
+
+        /* ── LOADING ── */
+        #loading-overlay {
+            position:fixed; inset:0; z-index:9999; background:#000; color:#fff;
+            display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+        }
+        #loading-overlay h2 { font-size:1.2rem; font-weight:900; text-transform:uppercase; letter-spacing:2px; }
+        .load-bar-wrap { width:280px; height:3px; background:#333; }
+        .load-bar { height:100%; background:var(--accent-red); animation:lb 1.8s ease-in-out infinite alternate; }
+        @keyframes lb { from{width:10%} to{width:90%} }
+        #loading-overlay p { font-family:'Courier New',monospace; font-size:0.7rem; color:#888; text-transform:uppercase; }
+    </style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-overlay">
+    <h2>Astronav Matrix <span style="color:var(--accent-red)">V2.0</span></h2>
+    <div class="load-bar-wrap"><div class="load-bar"></div></div>
+    <p id="load-status">Initializing SwissEph WASM...</p>
+</div>
+
+<!-- HEADER -->
+<header id="app-header">
+    <div class="hdr-brand">
+        <h1>Astronav Matrix <span style="color:var(--accent-red)">V2.0</span></h1>
+        <div class="tagline">Topocentric 3D · Great-Circle · ZEN & NAD Full Static Pole Aspect Engine</div>
+    </div>
+    <div class="hdr-live"><div class="live-dot"></div><span id="live-label">STANDBY</span></div>
+</header>
+
+<!-- BODY -->
+<div id="app-body">
+<div id="left-panel">
+
+    <!-- CONTROL -->
+    <section>
+        <div class="section-label">Time Machine & Observer</div>
+        <div id="control-panel">
+            <div class="ctrl-grp" style="min-width:210px;">
+                <label>Lokasi Pengamat (Geocoding)</label>
+                <div id="geo-wrap">
+                    <input type="text" id="geo-input" class="ctrl-input" placeholder="Ketik nama kota...">
+                    <div id="geo-results"></div>
+                </div>
+            </div>
+            <div class="ctrl-grp"><label>Tanggal</label><input type="date" id="inp-date" class="ctrl-input"></div>
+            <div class="ctrl-grp"><label>Jam (HH:MM:SS)</label><input type="text" id="inp-time" class="ctrl-input" placeholder="00:00:00"></div>
+            <div class="ctrl-grp">
+                <label>Zona Waktu</label>
+                <select id="sel-tz" class="ctrl-input">
+                    <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                    <option value="Asia/Makassar">Asia/Makassar (WITA)</option>
+                    <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">America/New_York</option>
+                    <option value="Europe/London">Europe/London</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo</option>
+                </select>
+            </div>
+            <div class="ctrl-grp">
+                <label>Warp</label>
+                <select id="sel-warp" class="ctrl-input">
+                    <option value="N">N — 1s = 1 Detik</option>
+                    <option value="1M">1M — 1s = 1 Menit</option>
+                    <option value="1H">1H — 1s = 1 Jam</option>
+                    <option value="1D">1D — 1s = 1 Hari</option>
+                </select>
+            </div>
+            <div class="ctrl-grp" style="min-width:270px;">
+                <label>Navigasi</label>
+                <div class="btn-group">
+                    <button class="btn" id="btn-back">◀◀</button>
+                    <button class="btn" id="btn-play">▶ PLAY</button>
+                    <button class="btn" id="btn-fwd">▶▶</button>
+                    <button class="btn" id="btn-reset">↺ RESET</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MAP -->
+    <section>
+        <div class="section-label">Peta Pengamat (Leaflet · CartoDB Positron)</div>
+        <div id="map-container">
+            <div id="map"></div>
+            <div class="map-badge" id="map-badge">LAT: — LON: —</div>
+        </div>
+    </section>
+
+    <!-- TELEMETRY -->
+    <section>
+        <div class="section-label">Chrono Telemetry</div>
+        <div class="tele-grid">
+            <div class="tele-cell"><div class="tc-label">Local Time</div><div class="tc-val" id="tc-local">—</div></div>
+            <div class="tele-cell"><div class="tc-label">UTC</div><div class="tc-val" id="tc-utc">—</div></div>
+            <div class="tele-cell"><div class="tc-label">Julian Date</div><div class="tc-val" id="tc-jd">—</div></div>
+            <div class="tele-cell"><div class="tc-label">LST</div><div class="tc-val" id="tc-lst">—</div></div>
+        </div>
+    </section>
+
+    <!-- MATRIX 1 -->
+    <section class="matrix-section">
+        <div class="mx-title">Matriks 1 — Aspek Terbobot 3D Great-Circle (13×13)</div>
+        <div class="mx-legend">
+            ▲ KANAN-ATAS (j &gt; i): Zenith Zone — Planet/SUI isAbove=true &amp; kolom ZEN aktif penuh<br>
+            ▼ KIRI-BAWAH (j &lt; i): Nadir Zone — Planet/SUI isAbove=false &amp; kolom NAD aktif penuh<br>
+            <strong>ZEN &amp; NAD = Entitas Statis Poros Permanen · Selalu Dihitung Aspeknya</strong> · ORB: ±3.00°
+        </div>
+        <div class="mx-scroll">
+            <table class="mx"><thead id="mx1-head"></thead><tbody id="mx1-body"></tbody></table>
+        </div>
+        <div class="score-layout">
+            <div class="score-card">
+                <h4>Global Category Score</h4>
+                <div class="score-row"><span class="sr-label" style="color:#2e7d32">● GREEN</span> <span id="sg-green">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#1565c0">● BLUE</span>  <span id="sg-blue">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#616161">● GRAY</span>  <span id="sg-gray">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#f9a825">● YELLOW</span><span id="sg-yellow">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#c62828">● RED</span>   <span id="sg-red">0.0</span></div>
+            </div>
+            <div class="score-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid var(--bg-border);padding-bottom:6px;">
+                    <h4 style="margin:0;border:none;padding:0;">Object Score</h4>
+                    <select id="sel-obj" class="ctrl-input" style="width:auto;height:26px;font-size:0.68rem;padding:0 6px;"></select>
+                </div>
+                <div class="score-row"><span class="sr-label" style="color:#2e7d32">— GREEN</span> <span id="so-green">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#1565c0">— BLUE</span>  <span id="so-blue">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#616161">— GRAY</span>  <span id="so-gray">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#f9a825">— YELLOW</span><span id="so-yellow">0.0</span></div>
+                <div class="score-row"><span class="sr-label" style="color:#c62828">— RED</span>   <span id="so-red">0.0</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MATRIX 2 -->
+    <section class="matrix-section" style="border-top:1px solid var(--bg-border);padding-top:18px;">
+        <div class="mx-title">Matriks 2 — Sudut Pisah 3D Murni θ (Great-Circle, semua pasangan)</div>
+        <div class="mx-legend">Nilai θ aktual via acos(v₁·v₂) — Universal tanpa filter</div>
+        <div class="mx-scroll">
+            <table class="mx"><thead id="mx2-head"></thead><tbody id="mx2-body"></tbody></table>
+        </div>
+    </section>
+
+    <!-- DEBUG -->
+    <section>
+        <div class="section-label">ZEN/NAD Aspect Trace Log</div>
+        <div id="debug-panel"><span style="color:#555">Menunggu kalkulasi...</span></div>
+    </section>
+
+</div><!-- /left-panel -->
+
+<div id="right-panel">
+    <div class="rp-section">
+        <div class="rp-title">Layer Control</div>
+        <div class="layer-row"><span>Planet Labels</span>         <label class="sw"><input type="checkbox" id="lyr-labels"  checked><span class="sw-s"></span></label></div>
+        <div class="layer-row"><span>Aspect Lines</span>          <label class="sw"><input type="checkbox" id="lyr-aspects" checked><span class="sw-s"></span></label></div>
+        <div class="layer-row"><span>Highlight Zenith</span>      <label class="sw"><input type="checkbox" id="lyr-zen-hi"  checked><span class="sw-s"></span></label></div>
+        <div class="layer-row"><span>Show Nadir Objects</span>    <label class="sw"><input type="checkbox" id="lyr-nadir"   checked><span class="sw-s"></span></label></div>
+        <div class="layer-row">
+            <span>Elevasi Pengamat (m)</span>
+            <input type="number" id="inp-elev" class="ctrl-input" style="width:80px;height:26px;font-size:0.75rem;" value="8" min="0" max="8848">
+        </div>
+    </div>
+
+    <div class="rp-section">
+        <div class="rp-title">3D Vector Hemisphere Projection</div>
+        <canvas id="vec-canvas" width="368" height="220"></canvas>
+        <div style="font-size:0.6rem;color:var(--text-secondary);margin-top:5px;font-family:'Courier New',monospace;">
+            Atas=Zenith Dome · Bawah=Nadir Dome · Garis berwarna=aspek aktif
+        </div>
+    </div>
+
+    <div class="rp-section" style="flex:1;overflow-y:auto;">
+        <div class="rp-title">Realtime Topocentric Monitor</div>
+        <div id="planet-monitor"></div>
+    </div>
+</div>
+</div><!-- /app-body -->
+
+<script type="module">
+import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+
+/* ═══════════════════════════════════════════
+   BOOT SWISSEPH
+═══════════════════════════════════════════ */
+const $ls = id => document.getElementById(id);
+$ls('load-status').textContent = 'Loading SwissEph WASM binary...';
+const swe = new SwissEph();
+await swe.initSwissEph();
+$ls('load-status').textContent = 'WASM Ready. Initializing systems...';
+
+const DateTime = luxon.DateTime;
+const D2R = Math.PI / 180;
+const R2D = 180 / Math.PI;
+const EPS = 23.439291 * D2R; // Obliquity J2000
+Math.clamp = (v,lo,hi) => Math.max(lo, Math.min(hi,v));
+
+/* ═══════════════════════════════════════════
+   MASTER DATA — 13 OBJEK
+═══════════════════════════════════════════ */
+const OBJECTS = [
+    // ── 10 Planet (idx 0–9)
+    { id:0,  name:'SUN', sym:'☉', color:'#ffb300', type:'planet'  },
+    { id:1,  name:'MON', sym:'☽', color:'#333333', type:'planet'  },
+    { id:2,  name:'MER', sym:'☿', color:'#616161', type:'planet'  },
+    { id:3,  name:'VEN', sym:'♀', color:'#c2185b', type:'planet'  },
+    { id:4,  name:'MAR', sym:'♂', color:'#fa541c', type:'planet'  },
+    { id:5,  name:'JUP', sym:'♃', color:'#d4a373', type:'planet'  },
+    { id:6,  name:'SAT', sym:'♄', color:'#8d6e63', type:'planet'  },
+    { id:7,  name:'URA', sym:'♅', color:'#00acc1', type:'planet'  },
+    { id:8,  name:'NEP', sym:'♆', color:'#1565c0', type:'planet'  },
+    { id:9,  name:'PLU', sym:'♇', color:'#78909c', type:'planet'  },
+    // ── 1 Bintang (idx 10)
+    { id:-1, name:'SUI', sym:'★', color:'#1976d2', type:'sirius'  },
+    // ── 2 Poros Statis (idx 11, 12)
+    { id:-2, name:'ZEN', sym:'Z', color:'#ff3b30', type:'zenith'  },
+    { id:-3, name:'NAD', sym:'N', color:'#555555', type:'nadir'   },
+];
+
+/* ═══════════════════════════════════════════
+   16 ASPEK
+═══════════════════════════════════════════ */
+const ASPECTS = [
+    { name:'Trigon',       angle:120,    val: 4.0,  zone:'GREEN',  sym:'△', cls:'c-green',  disp:'[+4]'   },
+    { name:'Sekstil',      angle:60,     val: 2.0,  zone:'BLUE',   sym:'⚹', cls:'c-blue',   disp:'[+2]'   },
+    { name:'Kuintil',      angle:72,     val: 2.4,  zone:'BLUE',   sym:'⬠', cls:'c-blue',   disp:'[+2.4]' },
+    { name:'Bikuintil',    angle:144,    val: 4.8,  zone:'BLUE',   sym:'⬟', cls:'c-blue',   disp:'[+4.8]' },
+    { name:'Novil',        angle:40,     val: 1.3,  zone:'BLUE',   sym:'◌', cls:'c-blue',   disp:'[+1.3]' },
+    { name:'Binovil',      angle:80,     val: 2.6,  zone:'BLUE',   sym:'◌', cls:'c-blue',   disp:'[+2.6]' },
+    { name:'Konjungsi',    angle:0,      val:12.0,  zone:'GRAY',   sym:'☌', cls:'c-gray',   disp:'[=12]'  },
+    { name:'Semi-sekstil', angle:30,     val: 1.0,  zone:'GRAY',   sym:'⚺', cls:'c-gray',   disp:'[=1]'   },
+    { name:'Septil',       angle:51.43,  val: 1.7,  zone:'GRAY',   sym:'⟐', cls:'c-gray',   disp:'[=1.7]' },
+    { name:'Biseptil',     angle:102.86, val: 3.4,  zone:'GRAY',   sym:'⟑', cls:'c-gray',   disp:'[=3.4]' },
+    { name:'Triseptil',    angle:154.29, val: 5.1,  zone:'GRAY',   sym:'⟒', cls:'c-gray',   disp:'[=5.1]' },
+    { name:'Semi-kuadrat', angle:45,     val: 1.5,  zone:'YELLOW', sym:'∠', cls:'c-yellow', disp:'[#1.5]' },
+    { name:'Kuinkunks',    angle:150,    val: 5.0,  zone:'YELLOW', sym:'⚻', cls:'c-yellow', disp:'[#5]'   },
+    { name:'Kuadrat',      angle:90,     val:-3.0,  zone:'RED',    sym:'□', cls:'c-red',    disp:'[-3]'   },
+    { name:'Seskikuadrat', angle:135,    val:-4.5,  zone:'RED',    sym:'⚼', cls:'c-red',    disp:'[-4.5]' },
+    { name:'Oposisi',      angle:180,    val:-6.0,  zone:'RED',    sym:'☍', cls:'c-red',    disp:'[-6]'   },
+];
+const ORB = 3.0;
+
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+const S = {
+    lat:-6.2088, lon:106.8456, elev:8,
+    chrono: DateTime.local().setZone('Asia/Jakarta'),
+    isPlaying:false, lastTick:0,
+    computed:[], activeAspects:[],
+};
+
+/* ═══════════════════════════════════════════
+   DOM SHORTCUTS
+═══════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const UI = {
+    geoInput:$('geo-input'), geoRes:$('geo-results'),
+    inpDate:$('inp-date'), inpTime:$('inp-time'),
+    selTZ:$('sel-tz'), selWarp:$('sel-warp'),
+    btnBack:$('btn-back'), btnPlay:$('btn-play'),
+    btnFwd:$('btn-fwd'), btnReset:$('btn-reset'),
+    inpElev:$('inp-elev'), selObj:$('sel-obj'),
+    mapBadge:$('map-badge'), liveLabel:$('live-label'),
+    tcLocal:$('tc-local'), tcUTC:$('tc-utc'), tcJD:$('tc-jd'), tcLST:$('tc-lst'),
+    mx1Head:$('mx1-head'), mx1Body:$('mx1-body'),
+    mx2Head:$('mx2-head'), mx2Body:$('mx2-body'),
+    planetMon:$('planet-monitor'), vecCanvas:$('vec-canvas'),
+    debugPanel:$('debug-panel'),
+    sgGreen:$('sg-green'), sgBlue:$('sg-blue'), sgGray:$('sg-gray'), sgYellow:$('sg-yellow'), sgRed:$('sg-red'),
+    soGreen:$('so-green'), soBlue:$('so-blue'), soGray:$('so-gray'), soYellow:$('so-yellow'), soRed:$('so-red'),
+};
+
+/* ── Isi dropdown objek ── */
+OBJECTS.forEach((o,i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = `${o.sym} ${o.name}`;
+    if(o.name==='SUN') opt.selected=true;
+    UI.selObj.appendChild(opt);
+});
+
+/* ═══════════════════════════════════════════
+   LEAFLET MAP
+═══════════════════════════════════════════ */
+const map = L.map('map',{zoomControl:true,attributionControl:false}).setView([S.lat,S.lon],5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);
+
+const obsIcon = L.divIcon({
+    html:`<div style="width:14px;height:14px;border-radius:50%;background:#ff3b30;border:3px solid #000;"></div>`,
+    className:'', iconAnchor:[7,7],
+});
+let marker = L.marker([S.lat,S.lon],{icon:obsIcon,draggable:true}).addTo(map);
+marker.on('dragend', e => { const p=e.target.getLatLng(); setObs(p.lat,p.lng); });
+map.on('click', e => { setObs(e.latlng.lat,e.latlng.lng); marker.setLatLng(e.latlng); });
+
+function setObs(lat,lon,elev) {
+    S.lat=lat; S.lon=lon;
+    if(elev!==undefined) S.elev=elev;
+    UI.mapBadge.textContent=`LAT:${lat.toFixed(5)}° LON:${lon.toFixed(5)}° ELEV:${S.elev}m`;
+}
+setObs(S.lat,S.lon,S.elev);
+
+/* ── Geocoding Nominatim ── */
+let geoTimer=null;
+UI.geoInput.addEventListener('input',()=>{
+    clearTimeout(geoTimer);
+    const q=UI.geoInput.value.trim();
+    if(q.length<3){UI.geoRes.style.display='none';return;}
+    geoTimer=setTimeout(async()=>{
+        try{
+            const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6`,{headers:{'Accept-Language':'id,en'}});
+            const d=await r.json();
+            if(!d.length){UI.geoRes.style.display='none';return;}
+            UI.geoRes.innerHTML=d.map(x=>`<div class="geo-item" data-lat="${x.lat}" data-lon="${x.lon}" data-name="${x.display_name}">${x.display_name}</div>`).join('');
+            UI.geoRes.style.display='block';
+        }catch(e){UI.geoRes.style.display='none';}
+    },380);
+});
+UI.geoRes.addEventListener('click',e=>{
+    const item=e.target.closest('.geo-item'); if(!item)return;
+    setObs(parseFloat(item.dataset.lat),parseFloat(item.dataset.lon));
+    marker.setLatLng([S.lat,S.lon]); map.flyTo([S.lat,S.lon],8,{duration:1.2});
+    UI.geoInput.value=item.dataset.name; UI.geoRes.style.display='none';
+});
+document.addEventListener('click',e=>{
+    if(!UI.geoInput.contains(e.target)&&!UI.geoRes.contains(e.target)) UI.geoRes.style.display='none';
+});
+
+/* ═══════════════════════════════════════════
+   TIME MACHINE
+═══════════════════════════════════════════ */
+function syncInputs(dt){ UI.inpDate.value=dt.toISODate(); UI.inpTime.value=dt.toFormat('HH:mm:ss'); }
+syncInputs(S.chrono);
+UI.inpDate.addEventListener('change', readInputs);
+UI.inpTime.addEventListener('change', readInputs);
+UI.selTZ.addEventListener('change',()=>{ S.chrono=S.chrono.setZone(UI.selTZ.value); syncInputs(S.chrono); });
+UI.inpElev.addEventListener('change',()=>{ S.elev=parseFloat(UI.inpElev.value)||0; setObs(S.lat,S.lon,S.elev); });
+
+function readInputs(){
+    if(S.isPlaying)return;
+    const dt=DateTime.fromISO(`${UI.inpDate.value}T${UI.inpTime.value}`,{zone:UI.selTZ.value});
+    if(dt.isValid) S.chrono=dt;
+}
+function warpStep(dt,dir){
+    const w=UI.selWarp.value;
+    if(w==='N')  return dt.plus({seconds:dir});
+    if(w==='1M') return dt.plus({minutes:dir});
+    if(w==='1H') return dt.plus({hours:dir});
+    if(w==='1D') return dt.plus({days:dir});
+    return dt;
+}
+UI.btnPlay.addEventListener('click',()=>{
+    S.isPlaying=!S.isPlaying;
+    UI.btnPlay.textContent=S.isPlaying?'⏸ PAUSE':'▶ PLAY';
+    UI.btnPlay.classList.toggle('active',S.isPlaying);
+});
+UI.btnBack.addEventListener('click', ()=>{ S.chrono=warpStep(S.chrono,-1); syncInputs(S.chrono); });
+UI.btnFwd.addEventListener('click',  ()=>{ S.chrono=warpStep(S.chrono, 1); syncInputs(S.chrono); });
+UI.btnReset.addEventListener('click',()=>{
+    S.isPlaying=false; UI.btnPlay.textContent='▶ PLAY'; UI.btnPlay.classList.remove('active');
+    S.chrono=DateTime.local().setZone(UI.selTZ.value); syncInputs(S.chrono);
+});
+UI.selObj.addEventListener('change',()=>{ if(S.computed.length) renderMatrix1(S.computed); });
+
+/* ═══════════════════════════════════════════
+   MATEMATIKA INTI
+═══════════════════════════════════════════ */
+function eclToEq(lonDeg, latDeg){
+    const lo=lonDeg*D2R, la=latDeg*D2R;
+    const sinDec=Math.sin(la)*Math.cos(EPS)+Math.cos(la)*Math.sin(EPS)*Math.sin(lo);
+    const dec=Math.asin(Math.clamp(sinDec,-1,1));
+    let ra=Math.atan2(Math.sin(lo)*Math.cos(EPS)-Math.tan(la)*Math.sin(EPS), Math.cos(lo));
+    if(ra<0) ra+=2*Math.PI;
+    return {ra,dec};
+}
+function eqToHz(ra,dec,lst,lat){
+    const ha=lst-ra;
+    const sinAlt=Math.sin(lat)*Math.sin(dec)+Math.cos(lat)*Math.cos(dec)*Math.cos(ha);
+    const alt=Math.asin(Math.clamp(sinAlt,-1,1));
+    let az=Math.atan2(-Math.sin(ha), Math.tan(dec)*Math.cos(lat)-Math.sin(lat)*Math.cos(ha));
+    if(az<0) az+=2*Math.PI;
+    return {az,alt};
+}
+
+/**
+ * Konversi (Az,Alt) radian → Vektor Satuan 3D
+ * +X=Utara, +Y=Timur, +Z=Zenith lokal
+ */
+function vec3(az,alt){
+    const ca=Math.cos(alt);
+    return [ ca*Math.cos(az), ca*Math.sin(az), Math.sin(alt) ];
+}
+
+/**
+ * Great-Circle Separation: θ = acos(v1·v2)
+ * Anti-singularitas via Math.clamp
+ */
+function gcSep(v1,v2){
+    const dot=Math.clamp(v1[0]*v2[0]+v1[1]*v2[1]+v1[2]*v2[2],-1,1);
+    return Math.acos(dot)*R2D;
+}
+
+/** Cari aspek nearest-match dalam ORB 3° */
+function matchAsp(theta){
+    let best=null, bestOrb=ORB;
+    for(const a of ASPECTS){
+        const o=Math.abs(theta-a.angle);
+        if(o<=bestOrb){ bestOrb=o; best=a; }
+    }
+    return best;
+}
+
+/* ═══════════════════════════════════════════
+   EPHEMERIS PIPELINE
+═══════════════════════════════════════════ */
+function computeAll(utcDT){
+    const jd=swe.julday(utcDT.year,utcDT.month,utcDT.day,
+                         utcDT.hour+utcDT.minute/60+utcDT.second/3600);
+    try{ swe.set_topo(S.lon,S.lat,S.elev); }catch(e){}
+    const gmst   = swe.sidtime(jd);
+    const lstDeg = ((gmst*15+S.lon)%360+360)%360;
+    const lst    = lstDeg*D2R;
+    const lat    = S.lat*D2R;
+
+    return OBJECTS.map(obj=>{
+
+        /* ─── ZENITH: Poros Statis +Z ─── */
+        if(obj.type==='zenith'){
+            return {
+                ...obj, jd,
+                az:0, alt:90, azRad:0, altRad:Math.PI/2,
+                vec:[0,0,1],
+                isAbove:true,
+                earthLat:S.lat, earthLon:S.lon,
+            };
+        }
+
+        /* ─── NADIR: Poros Statis -Z ─── */
+        if(obj.type==='nadir'){
+            return {
+                ...obj, jd,
+                az:0, alt:-90, azRad:0, altRad:-Math.PI/2,
+                vec:[0,0,-1],
+                isAbove:false,
+                earthLat:-S.lat, earthLon:((S.lon+180)%360),
+            };
+        }
+
+        /* ─── PLANET: SwissEph toposentrik ─── */
+        let ra, dec;
+        if(obj.type==='planet'){
+            let res;
+            try{ res=swe.calc_ut(jd,obj.id,32768); }
+            catch(e){ res=swe.calc_ut(jd,obj.id,0); }
+            const eq=eclToEq(res[0],res[1]); ra=eq.ra; dec=eq.dec;
+        }
+
+        /* ─── SIRIUS: fixstar dinamis ─── */
+        if(obj.type==='sirius'){
+            try{
+                const fs=swe.fixstar2_ut('Sirius',jd,0);
+                const eq=eclToEq(fs[0],fs[1]); ra=eq.ra; dec=eq.dec;
+            }catch(e){
+                ra =(6+45/60+8.917/3600)*15*D2R;
+                dec=-(16+42/60+58.02/3600)*D2R;
+            }
+        }
+
+        const {az,alt}=eqToHz(ra,dec,lst,lat);
+        const altDeg=alt*R2D, azDeg=az*R2D;
+        const haDeg=(lst-ra)*R2D;
+        const subLon=((S.lon-haDeg)%360+360)%360;
+
+        return {
+            ...obj, jd, ra, dec, lstDeg,
+            az:azDeg, alt:altDeg, azRad:az, altRad:alt,
+            vec:vec3(az,alt),
+            isAbove:altDeg>=0,
+            earthLat:dec*R2D,
+            earthLon:subLon>180?subLon-360:subLon,
+        };
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ╔═══════════════════════════════════════════════════════════╗
+   ║          LOGIKA FILTER MATRIKS — REVISI FINAL            ║
+   ║          ZEN & NAD sebagai ENTITAS STATIS PENUH          ║
+   ╠═══════════════════════════════════════════════════════════╣
+   ║                                                           ║
+   ║  PEMAHAMAN DASAR:                                         ║
+   ║  ─────────────────────────────────────────────────────    ║
+   ║  ZEN = titik tepat di atas kepala. alt=+90°, vec=[0,0,1] ║
+   ║  NAD = titik tepat di bawah kaki. alt=-90°, vec=[0,0,-1] ║
+   ║                                                           ║
+   ║  Keduanya BUKAN planet, tapi TITIK REFERENSI GEOMETRI    ║
+   ║  yang harus dihitung aspeknya terhadap SEMUA benda langit ║
+   ║  lain sesuai zonanya.                                     ║
+   ║                                                           ║
+   ║  ATURAN ZONA:                                             ║
+   ║  ─────────────────────────────────────────────────────    ║
+   ║  ZENITH ZONE (j > i, segitiga kanan-atas):               ║
+   ║    Berisi semua pasangan objek "di atas langit"           ║
+   ║    Kondisi aktif sel (A, B):                              ║
+   ║      • Tidak boleh ada NAD (dilarang di zona Zenith)      ║
+   ║      • A harus "bisa jadi Zenith-side":                   ║
+   ║          → A.isAbove=true  ATAU A.type==='zenith'         ║
+   ║      • B harus "bisa jadi Zenith-side":                   ║
+   ║          → B.isAbove=true  ATAU B.type==='zenith'         ║
+   ║                                                           ║
+   ║  NADIR ZONE (j < i, segitiga kiri-bawah):                ║
+   ║    Berisi semua pasangan objek "di bawah bumi"            ║
+   ║    Kondisi aktif sel (A, B):                              ║
+   ║      • Tidak boleh ada ZEN (dilarang di zona Nadir)       ║
+   ║      • A harus "bisa jadi Nadir-side":                    ║
+   ║          → A.isAbove=false ATAU A.type==='nadir'          ║
+   ║      • B harus "bisa jadi Nadir-side":                    ║
+   ║          → B.isAbove=false ATAU B.type==='nadir'          ║
+   ║                                                           ║
+   ║  KENAPA INI BENAR:                                        ║
+   ║  ─────────────────────────────────────────────────────    ║
+   ║  ZEN.isAbove = true  → lolos kondisi Zenith-side ✓       ║
+   ║  NAD.isAbove = false → lolos kondisi Nadir-side  ✓       ║
+   ║                                                           ║
+   ║  Contoh: Planet X (isAbove=true) vs ZEN                   ║
+   ║    isZenSide(X) = X.isAbove=true ✓                        ║
+   ║    isZenSide(ZEN) = ZEN.type==='zenith' ✓                 ║
+   ║    → AKTIF → hitung gcSep → cek aspek ✓                  ║
+   ║                                                           ║
+   ║  Contoh: Planet Y (isAbove=false) vs NAD                  ║
+   ║    isNadSide(Y) = Y.isAbove=false ✓                       ║
+   ║    isNadSide(NAD) = NAD.type==='nadir' ✓                  ║
+   ║    → AKTIF → hitung gcSep → cek aspek ✓                  ║
+   ╚═══════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════════════════ */
+
+/** Apakah objek X valid sebagai anggota Zenith Zone? */
+function isZenithSide(X){
+    // ZEN selalu valid di Zenith Zone
+    if(X.type==='zenith') return true;
+    // NAD TIDAK PERNAH valid di Zenith Zone
+    if(X.type==='nadir')  return false;
+    // Planet/Sirius: harus di atas horizon
+    return X.isAbove;
+}
+
+/** Apakah objek X valid sebagai anggota Nadir Zone? */
+function isNadirSide(X){
+    // NAD selalu valid di Nadir Zone
+    if(X.type==='nadir')  return true;
+    // ZEN TIDAK PERNAH valid di Nadir Zone
+    if(X.type==='zenith') return false;
+    // Planet/Sirius: harus di bawah horizon
+    return !X.isAbove;
+}
+
+/** Cek apakah sel (A,B) aktif di Zenith Zone */
+function zenithCellOK(A,B){ return isZenithSide(A) && isZenithSide(B); }
+
+/** Cek apakah sel (A,B) aktif di Nadir Zone */
+function nadirCellOK(A,B) { return isNadirSide(A)  && isNadirSide(B);  }
+
+/* ═══════════════════════════════════════════
+   MATRIX 1 RENDERER
+═══════════════════════════════════════════ */
+function renderMatrix1(data){
+    const N=data.length; // 13
+    const tgt=parseInt(UI.selObj.value);
+    const gSc={GREEN:0,BLUE:0,GRAY:0,YELLOW:0,RED:0};
+    const oSc={GREEN:0,BLUE:0,GRAY:0,YELLOW:0,RED:0};
+    const aspLines=[];
+    const dbg=[];
+
+    /* ── Header Row ── */
+    let hH='<tr><th style="min-width:68px">↓ ROW / COL →</th>';
+    data.forEach((o,j)=>{
+        const cls = o.type==='zenith'?'th-zen': o.type==='nadir'?'th-nad':'';
+        hH+=`<th class="${cls}">${o.sym}<br><span style="font-size:0.56rem;font-weight:400">${o.name}</span></th>`;
+    });
+    hH+='</tr>';
+    UI.mx1Head.innerHTML=hH;
+
+    /* ── Body ── */
+    let bH='';
+    for(let i=0;i<N;i++){
+        const A=data[i];
+        bH+=`<tr><td class="rh">${A.sym} ${A.name}</td>`;
+
+        for(let j=0;j<N;j++){
+            const B=data[j];
+
+            /* DIAGONAL */
+            if(i===j){ bH+=`<td class="diag"></td>`; continue; }
+
+            /* ───────────────────────────────────────────────
+               ZENITH ZONE: segitiga KANAN-ATAS (j > i)
+               Aturan: isZenithSide(A) && isZenithSide(B)
+               ZEN (type='zenith') selalu lolos isZenithSide
+            _______________________________________________ */
+            if(j>i){
+                // Terapkan highlight kolom ZEN/NAD
+                const colCls = B.type==='zenith'?'td-zen-col': B.type==='nadir'?'td-nad-col':'';
+
+                if(!zenithCellOK(A,B)){
+                    bH+=`<td class="inact ${colCls}">×</td>`;
+                    continue;
+                }
+
+                const theta=gcSep(A.vec,B.vec);
+                const m=matchAsp(theta);
+
+                // Log debug untuk pasangan yang melibatkan ZEN
+                if(A.type==='zenith'||B.type==='zenith'){
+                    dbg.push({pole:'ZEN',a:A.name,b:B.name,theta,matched:m,zone:'ZENITH'});
+                }
+
+                if(m){
+                    bH+=`<td class="${m.cls} ${colCls}">
+                        <span class="asp-val">${m.disp}</span>
+                        <span class="asp-sym">${m.sym}</span>
+                    </td>`;
+                    gSc[m.zone]+=m.val;
+                    if(i===tgt||j===tgt) oSc[m.zone]+=m.val;
+                    aspLines.push({v1:A.vec,v2:B.vec,zone:m.zone,isAbove:true});
+                } else {
+                    bH+=`<td class="${colCls}" style="color:#aaa;font-size:0.62rem">${theta.toFixed(1)}°</td>`;
+                }
+            }
+
+            /* ───────────────────────────────────────────────
+               NADIR ZONE: segitiga KIRI-BAWAH (j < i)
+               Aturan: isNadirSide(A) && isNadirSide(B)
+               NAD (type='nadir') selalu lolos isNadirSide
+            _______________________________________________ */
+            else {
+                const colCls = B.type==='zenith'?'td-zen-col': B.type==='nadir'?'td-nad-col':'';
+
+                if(!nadirCellOK(A,B)){
+                    bH+=`<td class="inact ${colCls}">×</td>`;
+                    continue;
+                }
+
+                const theta=gcSep(A.vec,B.vec);
+                const m=matchAsp(theta);
+
+                // Log debug untuk pasangan yang melibatkan NAD
+                if(A.type==='nadir'||B.type==='nadir'){
+                    dbg.push({pole:'NAD',a:A.name,b:B.name,theta,matched:m,zone:'NADIR'});
+                }
+
+                if(m){
+                    bH+=`<td class="${m.cls} ${colCls}">
+                        <span class="asp-val">${m.disp}</span>
+                        <span class="asp-sym">${m.sym}</span>
+                    </td>`;
+                    gSc[m.zone]+=m.val;
+                    if(i===tgt||j===tgt) oSc[m.zone]+=m.val;
+                    aspLines.push({v1:A.vec,v2:B.vec,zone:m.zone,isAbove:false});
+                } else {
+                    bH+=`<td class="${colCls}" style="color:#aaa;font-size:0.62rem">${theta.toFixed(1)}°</td>`;
+                }
+            }
+        }
+        bH+='</tr>';
+    }
+
+    UI.mx1Body.innerHTML=bH;
+    S.activeAspects=aspLines;
+
+    /* ── Score Update ── */
+    UI.sgGreen.textContent =gSc.GREEN.toFixed(1);
+    UI.sgBlue.textContent  =gSc.BLUE.toFixed(1);
+    UI.sgGray.textContent  =gSc.GRAY.toFixed(1);
+    UI.sgYellow.textContent=gSc.YELLOW.toFixed(1);
+    UI.sgRed.textContent   =gSc.RED.toFixed(1);
+    UI.soGreen.textContent =oSc.GREEN.toFixed(1);
+    UI.soBlue.textContent  =oSc.BLUE.toFixed(1);
+    UI.soGray.textContent  =oSc.GRAY.toFixed(1);
+    UI.soYellow.textContent=oSc.YELLOW.toFixed(1);
+    UI.soRed.textContent   =oSc.RED.toFixed(1);
+
+    /* ── Debug Panel ── */
+    renderDebug(data, dbg);
+}
+
+/* ═══════════════════════════════════════════
+   DEBUG PANEL
+═══════════════════════════════════════════ */
+function renderDebug(data, dbgPairs){
+    const zen=data.find(o=>o.type==='zenith');
+    const nad=data.find(o=>o.type==='nadir');
+
+    let h=`<span class="dbg-title">─── VEKTOR POROS STATIS ───</span>\n`;
+    h+=`ZEN vec=[${zen.vec.map(v=>v.toFixed(4)).join(', ')}] alt=+90° isAbove=${zen.isAbove}\n`;
+    h+=`NAD vec=[${nad.vec.map(v=>v.toFixed(4)).join(', ')}] alt=-90° isAbove=${nad.isAbove}\n\n`;
+
+    h+=`<span class="dbg-title">─── θ ZEN terhadap semua objek ───</span>\n`;
+    data.forEach(obj=>{
+        if(obj.type==='zenith')return;
+        const theta=gcSep(zen.vec,obj.vec);
+        const m=matchAsp(theta);
+        const aktif=isZenithSide(obj);
+        const asp  = m ? `<span class="dbg-hit">${m.name} ${m.disp}</span>` : `<span class="dbg-miss">${theta.toFixed(2)}° —no match—</span>`;
+        const flag = aktif ? '' : `<span class="dbg-inact">[INAKTIF: bawah horizon]</span>`;
+        h+=`${obj.sym}${obj.name} θ=${theta.toFixed(2)}° → ${asp} ${flag}\n`;
+    });
+
+    h+=`\n<span class="dbg-title">─── θ NAD terhadap semua objek ───</span>\n`;
+    data.forEach(obj=>{
+        if(obj.type==='nadir')return;
+        const theta=gcSep(nad.vec,obj.vec);
+        const m=matchAsp(theta);
+        const aktif=isNadirSide(obj);
+        const asp  = m ? `<span class="dbg-hit">${m.name} ${m.disp}</span>` : `<span class="dbg-miss">${theta.toFixed(2)}° —no match—</span>`;
+        const flag = aktif ? '' : `<span class="dbg-inact">[INAKTIF: atas horizon]</span>`;
+        h+=`${obj.sym}${obj.name} θ=${theta.toFixed(2)}° → ${asp} ${flag}\n`;
+    });
+
+    UI.debugPanel.innerHTML=h;
+}
+
+/* ═══════════════════════════════════════════
+   MATRIX 2 — RAW THETA
+═══════════════════════════════════════════ */
+function renderMatrix2(data){
+    let hH='<tr><th style="min-width:68px">↓/→</th>';
+    data.forEach(o=>{
+        const cls=o.type==='zenith'?'th-zen':o.type==='nadir'?'th-nad':'';
+        hH+=`<th class="${cls}">${o.sym}<br><span style="font-size:0.56rem;font-weight:400">${o.name}</span></th>`;
+    });
+    hH+='</tr>';
+    UI.mx2Head.innerHTML=hH;
+
+    let bH='';
+    for(let i=0;i<data.length;i++){
+        bH+=`<tr><td class="rh">${data[i].sym} ${data[i].name}</td>`;
+        for(let j=0;j<data.length;j++){
+            if(i===j){bH+=`<td class="diag"></td>`;continue;}
+            const theta=gcSep(data[i].vec,data[j].vec);
+            const m=matchAsp(theta);
+            const cls=m?m.cls:'';
+            bH+=`<td class="${cls}" style="font-size:0.63rem;color:#333">${theta.toFixed(2)}°</td>`;
+        }
+        bH+='</tr>';
+    }
+    UI.mx2Body.innerHTML=bH;
+}
+
+/* ═══════════════════════════════════════════
+   PLANET MONITOR
+═══════════════════════════════════════════ */
+function renderMonitor(data){
+    const showNad=$('lyr-nadir').checked;
+    UI.planetMon.innerHTML=data
+        .filter(p=>p.type!=='zenith'&&p.type!=='nadir')
+        .filter(p=>showNad||p.isAbove)
+        .map(p=>{
+            const badge=p.isAbove
+                ?`<span class="pm-badge badge-zen">ZEN</span>`
+                :`<span class="pm-badge badge-nad">NAD</span>`;
+            return `<div class="pm-row">
+                <div class="pm-dot" style="background:${p.color}"></div>
+                <div class="pm-name">${p.sym} ${p.name}</div>
+                <div class="pm-data">AZ ${p.az.toFixed(1)}° ALT ${p.alt.toFixed(1)}°<br>[${p.vec.map(v=>v.toFixed(2)).join(',')}]</div>
+                ${badge}
+            </div>`;
+        }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   3D VECTOR CANVAS
+═══════════════════════════════════════════ */
+const vCtx=UI.vecCanvas.getContext('2d');
+const VW=368,VH=220,VCX=VW/2,VCY=VH/2,VR=84;
+const ZONE_CLR={
+    GREEN:'rgba(102,187,106,0.55)', BLUE:'rgba(66,165,245,0.55)',
+    GRAY:'rgba(180,180,180,0.45)',  YELLOW:'rgba(255,238,88,0.6)',
+    RED:'rgba(239,83,80,0.55)',
+};
+
+function proj3D(v,isAbove){
+    const halfH=VH/2-14;
+    const px=VCX+v[1]*VR;
+    const py=isAbove
+        ?(VCY-halfH)+(1-v[2])*halfH*0.93
+        :(VCY      )+(-1-v[2])*halfH*(-0.93);
+    return {px,py};
+}
+
+function renderCanvas(data){
+    vCtx.clearRect(0,0,VW,VH);
+    vCtx.fillStyle='#f8f8f8'; vCtx.fillRect(0,0,VW,VH);
+
+    // Garis horizon tengah
+    vCtx.beginPath(); vCtx.moveTo(0,VCY); vCtx.lineTo(VW,VCY);
+    vCtx.strokeStyle='#000'; vCtx.lineWidth=1.2; vCtx.setLineDash([5,5]); vCtx.stroke();
+    vCtx.setLineDash([]);
+
+    vCtx.fillStyle='#bbb'; vCtx.font='600 8px Helvetica,Arial'; vCtx.textAlign='left';
+    vCtx.fillText('ZENITH DOME',6,13); vCtx.fillText('NADIR DOME',6,VH-4);
+
+    // Lingkaran referensi
+    [[VCY/2,true],[VCY+VCY/2,false]].forEach(([cy2])=>{
+        vCtx.beginPath(); vCtx.arc(VCX,cy2,VR*0.88,0,2*Math.PI);
+        vCtx.strokeStyle='#e5e5e5'; vCtx.lineWidth=1; vCtx.stroke();
+    });
+
+    // Aspect lines
+    if($('lyr-aspects').checked){
+        S.activeAspects.forEach(asp=>{
+            const p1=proj3D(asp.v1,asp.isAbove),p2=proj3D(asp.v2,asp.isAbove);
+            vCtx.beginPath(); vCtx.moveTo(p1.px,p1.py); vCtx.lineTo(p2.px,p2.py);
+            vCtx.strokeStyle=ZONE_CLR[asp.zone]||'rgba(150,150,150,0.4)';
+            vCtx.lineWidth=1.6; vCtx.stroke();
+        });
+    }
+
+    // Planet nodes
+    const showNad=$('lyr-nadir').checked;
+    const showHi=$('lyr-zen-hi').checked;
+    const showLbl=$('lyr-labels').checked;
+
+    data.forEach(p=>{
+        if(p.type==='zenith'||p.type==='nadir')return;
+        if(!p.isAbove&&!showNad)return;
+        const pt=proj3D(p.vec,p.isAbove);
+        vCtx.beginPath(); vCtx.arc(pt.px,pt.py,6,0,2*Math.PI);
+        vCtx.fillStyle=p.color; vCtx.fill();
+        vCtx.strokeStyle=p.isAbove&&showHi?'#000':'#aaa';
+        vCtx.lineWidth=p.isAbove&&showHi?1.5:0.8; vCtx.stroke();
+        vCtx.fillStyle='#000'; vCtx.font='9px sans-serif';
+        vCtx.textAlign='center'; vCtx.textBaseline='middle';
+        vCtx.fillText(p.sym,pt.px,pt.py+0.5);
+        if(showLbl){
+            vCtx.fillStyle='#333'; vCtx.font='bold 7px Helvetica,Arial';
+            vCtx.fillText(p.name,pt.px,pt.py-10);
+        }
+    });
+
+    // ZEN pole marker
+    const zPt=proj3D([0,0,1],true);
+    vCtx.beginPath(); vCtx.arc(zPt.px,zPt.py,7,0,2*Math.PI);
+    vCtx.fillStyle='#ff3b30'; vCtx.fill();
+    vCtx.strokeStyle='#000'; vCtx.lineWidth=1.5; vCtx.stroke();
+    vCtx.fillStyle='#fff'; vCtx.font='bold 8px Helvetica,Arial';
+    vCtx.textAlign='center'; vCtx.textBaseline='middle';
+    vCtx.fillText('Z',zPt.px,zPt.py);
+    vCtx.fillStyle='#ff3b30'; vCtx.font='bold 7px Helvetica,Arial';
+    vCtx.fillText('ZEN',zPt.px,zPt.py-12);
+
+    // NAD pole marker
+    const nPt=proj3D([0,0,-1],false);
+    vCtx.beginPath(); vCtx.arc(nPt.px,nPt.py,7,0,2*Math.PI);
+    vCtx.fillStyle='#555'; vCtx.fill();
+    vCtx.strokeStyle='#333'; vCtx.lineWidth=1.5; vCtx.stroke();
+    vCtx.fillStyle='#fff'; vCtx.font='bold 8px Helvetica,Arial';
+    vCtx.textAlign='center'; vCtx.textBaseline='middle';
+    vCtx.fillText('N',nPt.px,nPt.py);
+    vCtx.fillStyle='#555'; vCtx.font='bold 7px Helvetica,Arial';
+    vCtx.fillText('NAD',nPt.px,nPt.py+12);
+}
+
+/* ═══════════════════════════════════════════
+   TELEMETRY UPDATE
+═══════════════════════════════════════════ */
+function updateTelemetry(utcDT,jd,gmst,lstDeg){
+    UI.tcLocal.textContent  = S.chrono.toFormat('HH:mm:ss ZZZZ');
+    UI.tcUTC.textContent    = utcDT.toFormat('yyyy-MM-dd HH:mm:ss')+' UTC';
+    UI.tcJD.textContent     = jd.toFixed(6);
+    UI.tcLST.textContent    = `GMST ${gmst.toFixed(4)}h · LST ${lstDeg.toFixed(2)}°`;
+    UI.liveLabel.textContent= `JD ${jd.toFixed(5)} · ${S.chrono.toFormat('HH:mm:ss')}`;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN LOOP
+═══════════════════════════════════════════ */
+function mainLoop(ts){
+    if(S.isPlaying){
+        if(!S.lastTick) S.lastTick=ts;
+        if(ts-S.lastTick>=1000){ S.chrono=warpStep(S.chrono,1); S.lastTick=ts; syncInputs(S.chrono); }
+    } else { S.lastTick=0; readInputs(); }
+
+    if(!S.chrono.isValid){ requestAnimationFrame(mainLoop); return; }
+
+    const utcDT=S.chrono.toUTC();
+    const jd=swe.julday(utcDT.year,utcDT.month,utcDT.day,
+                         utcDT.hour+utcDT.minute/60+utcDT.second/3600);
+    const gmst=swe.sidtime(jd);
+    const lstDeg=((gmst*15+S.lon)%360+360)%360;
+
+    S.computed=computeAll(utcDT);
+    renderMatrix1(S.computed);
+    renderMatrix2(S.computed);
+    renderMonitor(S.computed);
+    renderCanvas(S.computed);
+    updateTelemetry(utcDT,jd,gmst,lstDeg);
+
+    requestAnimationFrame(mainLoop);
+}
+
+/* ═══════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════ */
+$('load-status').textContent='All systems nominal. Launching engine...';
+await new Promise(r=>setTimeout(r,500));
+$('loading-overlay').style.display='none';
+S.chrono=DateTime.local().setZone('Asia/Jakarta');
+syncInputs(S.chrono);
+requestAnimationFrame(mainLoop);
+
+</script>
+</body>
+</html>

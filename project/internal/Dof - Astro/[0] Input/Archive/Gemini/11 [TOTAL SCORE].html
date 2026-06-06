@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronav Matrix - Advanced Precision Temporal Matrix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Helvetica+Neue,Helvetica,Arial,sans-serif&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+
+    <style>
+        :root {
+            /* Brand Light Palette */
+            --bg-main: #ffffff;
+            --bg-surface: #f5f5f5;
+            --bg-border: #e5e5e5;
+            --text-primary: #000000;
+            --text-secondary: #707072;
+            
+            /* Planet Colors */
+            --color-sun: #ffb300; --color-moon: #000000; --color-mercury: #424242; --color-venus: #e0a6b1;
+            --color-mars: #fa541c; --color-jupiter: #d4a373; --color-saturn: #b5a46d; --color-uranus: #73c2fb;
+            --color-neptune: #204060; --color-pluto: #8e8e93; --color-sirius: #007aff;
+
+            /* Warna Cell Aspek */
+            --cell-green: #e8f5e9; --cell-blue: #e3f2fd; --cell-gray: #f5f5f5; --cell-yellow: #fffde7; --cell-red: #ffebee;
+            --border-green: #a5d6a7; --border-blue: #90caf9; --border-gray: #cccccc; --border-yellow: #fff59d; --border-red: #ef9a9a;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main); color: var(--text-primary);
+            min-height: 100vh; margin: 0; padding: 40px 24px; box-sizing: border-box; -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            width: 100%; max-width: 1600px; margin: 0 auto 24px auto; border-bottom: 2px solid var(--text-primary); padding-bottom: 16px;
+            display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;
+        }
+
+        header h1 { font-size: 1.8rem; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; }
+        .subtitle { color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+
+        .chrono-control-panel {
+            width: 100%; max-width: 1600px; margin: 0 auto 32px auto; background-color: var(--bg-surface);
+            padding: 20px 24px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; border: 1px solid var(--bg-border);
+        }
+
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-group label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); }
+        .control-group input, .control-group select {
+            border: 1px solid var(--text-primary); background-color: var(--bg-main); color: var(--text-primary);
+            font-family: 'Roboto Mono', monospace; font-size: 0.85rem; padding: 6px 12px; outline: none; box-sizing: border-box; height: 34px;
+        }
+
+        .tm-btn-container { display: flex; gap: 4px; align-items: center; margin-top: 16px; }
+        .tm-btn {
+            background-color: var(--bg-main); color: var(--text-primary); border: 1px solid var(--text-primary);
+            font-size: 0.75rem; font-weight: 700; height: 34px; padding: 0 16px; cursor: pointer; text-transform: uppercase;
+            letter-spacing: 0.5px; transition: background-color 0.15s, color 0.15s; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .tm-btn:hover { background-color: var(--text-primary); color: var(--bg-main); }
+        .tm-btn.active-play { background-color: #ff3b30; color: #fff; border-color: #ff3b30; }
+
+        .main-container { display: grid; grid-template-columns: 1fr; gap: 32px; width: 100%; max-width: 1600px; margin: 0 auto; }
+        @media (min-width: 1200px) { .main-container { grid-template-columns: 1fr 380px; align-items: start; } }
+
+        .visual-panel { display: flex; flex-direction: column; gap: 40px; }
+        .canvas-row-split { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; position: relative; }
+        .canvas-card-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; flex: 1; min-width: 360px; }
+        .canvas-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; border-left: 3px solid var(--text-primary); padding-left: 8px; }
+        canvas { display: block; background-color: var(--bg-main); border: 1px solid var(--text-primary); width: 100%; max-width: 440px; height: auto; aspect-ratio: 1 / 1; }
+
+        .matrix-panel-container { border-top: 2px solid var(--text-primary); padding-top: 20px; width: 100%; }
+        .matrix-title { font-size: 0.9rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+        .matrix-legend { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .matrix-responsive { width: 100%; overflow-x: auto; margin-bottom: 24px; }
+
+        table.matrix-13 { width: 100%; min-width: 950px; border-collapse: collapse; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; }
+        table.matrix-13 th, table.matrix-13 td { border: 1px solid var(--bg-border); padding: 4px 1px; width: 7.14%; height: 44px; box-sizing: border-box; }
+        table.matrix-13 th { background-color: var(--bg-main); color: var(--text-primary); font-weight: 700; border-bottom: 2px solid var(--text-primary); }
+        table.matrix-13 th.row-header, table.matrix-13 td.row-header { font-weight: 700; text-align: left; padding-left: 8px; background-color: var(--bg-main); border-right: 2px solid var(--text-primary); }
+        table.matrix-13 td.diagonal-cell { background-color: #000000; }
+
+        .c-green { background-color: var(--cell-green); border: 1px solid var(--border-green) !important; color: #000000 !important; font-weight: 700; }
+        .c-blue  { background-color: var(--cell-blue);  border: 1px solid var(--border-blue) !important;  color: #000000 !important; font-weight: 700; }
+        .c-gray  { background-color: var(--cell-gray);  border: 1px solid var(--border-gray) !important;  color: #000000 !important; font-weight: 700; }
+        .c-yellow{ background-color: var(--cell-yellow); border: 1px solid var(--border-yellow) !important; color: #000000 !important; font-weight: 700; }
+        .c-red   { background-color: var(--cell-red);    border: 1px solid var(--border-red) !important;    color: #000000 !important; font-weight: 700; }
+
+        .inactive-zone { color: #d5d5d5 !important; background-color: #fafafa !important; font-weight: 400; }
+        .point-display { display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 1px; color: #000000; }
+        .symbol-lbl { font-size: 0.7rem; color: #555555; font-weight: 500; }
+
+        table.matrix-raw-angle td { background-color: #ffffff; color: #000000; font-weight: 500; }
+        table.matrix-raw-angle tr:hover td { background-color: var(--bg-surface); }
+
+        /* BARU: Sektor Layout Kalkulasi Skor Total Kategori & Objek (Nike/Adidas Style) */
+        .score-box-layout {
+            display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 16px; margin-bottom: 24px;
+        }
+        @media (min-width: 768px) {
+            .score-box-layout { grid-template-columns: 1fr 1fr; }
+        }
+        .score-card {
+            border: 1px solid var(--text-primary); padding: 20px; box-sizing: border-box; background-color: #ffffff;
+        }
+        .score-card h4 {
+            font-size: 0.8rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 16px 0;
+            border-bottom: 1px solid var(--text-primary); padding-bottom: 8px;
+        }
+        .score-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid var(--bg-border); font-family: 'Roboto Mono', monospace; font-size: 0.85rem; font-weight: 500;
+        }
+        .score-row .label-tag { font-weight: 700; text-transform: uppercase; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.78rem; }
+        .score-row .score-val { font-weight: 700; }
+
+        #loading { position: absolute; background-color: var(--text-primary); color: var(--bg-main); font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: 500; padding: 12px 20px; text-transform: uppercase; letter-spacing: 1px; z-index: 10; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .right-panel { display: flex; flex-direction: column; gap: 32px; }
+        .md-card { border-top: 1px solid var(--text-primary); padding-top: 16px; }
+        .card-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 16px 0; }
+        .clock-grid { display: grid; grid-template-columns: 1fr; gap: 12px; font-family: 'Roboto Mono', monospace; }
+        .time-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--bg-border); padding: 8px 0; font-size: 0.9rem; }
+        .time-box span { color: var(--text-secondary); font-weight: 500; text-transform: uppercase; font-size: 0.75rem; }
+
+        .layer-list { display: flex; flex-direction: column; }
+        .layer-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--bg-border); font-size: 0.85rem; font-weight: 500; }
+        .switch { position: relative; display: inline-block; width: 32px; height: 16px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-border); transition: .15s; cursor: pointer; }
+        .slider:before { position: absolute; content: ""; height: 10px; width: 10px; left: 3px; bottom: 3px; background-color: var(--text-primary); transition: .15s; }
+        input:checked + .slider { background-color: var(--text-primary); }
+        input:checked + .slider:before { transform: translateX(16px); background-color: var(--bg-main); }
+
+        .planet-monitor { display: flex; flex-direction: column; gap: 1px; background-color: var(--bg-border); max-height: 320px; overflow-y: auto; }
+        .p-stat { background-color: var(--bg-main); padding: 12px 0; display: grid; grid-template-columns: 24px 80px 1fr auto; align-items: center; gap: 8px; border-bottom: 1px solid var(--bg-border); }
+        .p-icon-dot { width: 8px; height: 8px; border-radius: 50%; justify-self: center; }
+        .p-name-tag { font-weight: 700; text-transform: uppercase; font-size: 0.85rem; }
+        .p-coords-tag { font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--text-secondary); }
+        .maps-btn { background-color: transparent; color: var(--text-primary); text-decoration: none; padding: 4px 12px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid var(--text-primary); transition: background-color 0.15s; }
+        .maps-btn:hover { background-color: var(--text-primary); color: var(--bg-main); }
+    </style>
+
+    <script type="module">
+        import SwissEph from 'https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js';
+        window.swe = new SwissEph();
+        await window.swe.initSwissEph();
+        document.getElementById('loading').style.display = 'none';
+        
+        const DateTime = luxon.DateTime;
+        const localNow = DateTime.local();
+        document.getElementById('inputDate').value = localNow.toISODate();
+        document.getElementById('inputTime').value = localNow.toFormat('HH:mm:ss');
+        
+        startRealtimeChronoLoop();
+    </script>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Astronav Matrix</h1>
+            <div class="subtitle" style="margin-top: 4px;">Luxon Warp Temporal Engine / Jakarta, ID</div>
+        </div>
+        <div class="subtitle" id="liveChronoLabel">ENGINE ACTIVE</div>
+    </header>
+
+    <div class="chrono-control-panel">
+        <div class="control-group">
+            <label for="selectTZ">Zona Waktu (Zone ID)</label>
+            <select id="selectTZ">
+                <option value="Asia/Jakarta" selected>Asia/Jakarta (WIB)</option>
+                <option value="Asia/Makassar">Asia/Makassar (WITA)</option>
+                <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
+                <option value="UTC">Coordinated Universal Time (UTC)</option>
+                <option value="America/New_York">America/New_York (EST)</option>
+                <option value="Europe/London">Europe/London (GMT)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="inputDate">Tanggal Target</label>
+            <input type="date" id="inputDate">
+        </div>
+        <div class="control-group">
+            <label for="inputTime">Jam Target (HH:MM:SS)</label>
+            <input type="text" id="inputTime" step="1">
+        </div>
+        <div class="control-group">
+            <label for="selectStep">Akselerasi Warp (1s Bumi = N)</label>
+            <select id="selectStep">
+                <option value="N" selected>N (1 Detik Riil = 1 Detik)</option>
+                <option value="1M">1M (1 Detik Riil = 1 Menit)</option>
+                <option value="1H">1H (1 Detik Riil = 1 Jam)</option>
+                <option value="1D">1D (1 Detik Riil = 1 Hari)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Navigasi Time Machine</label>
+            <div class="tm-btn-container">
+                <button class="tm-btn" id="btnBack">◀◀</button>
+                <button class="tm-btn" id="btnPlay">▶ PLAY</button>
+                <button class="tm-btn" id="btnForward">▶▶</button>
+                <button class="tm-btn" id="btnReset">RESET NOW</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="visual-panel">
+            <div class="canvas-row-split">
+                <div id="loading">Syncing SwissEph WASM...</div>
+                <div class="canvas-card-wrapper">
+                    <div class="canvas-label">Kubah Zenith (Atas Langit)</div>
+                    <canvas id="zenithCanvas" width="440" height="440"></canvas>
+                </div>
+                <div class="canvas-card-wrapper">
+                    <div class="canvas-label">Kubah Nadir (Bawah Bumi)</div>
+                    <canvas id="nadirCanvas" width="440" height="440"></canvas>
+                </div>
+            </div>
+
+            <div class="matrix-panel-container">
+                <div class="matrix-title">Matriks 1: Sektoral Terbobot Aspek 13 x 13</div>
+                <div class="matrix-legend">▲ KANAN-ATAS: Kubah Zenith | ▼ KIRI-BAWAH: Kubah Nadir | ORB MUTLAK: 3°</div>
+                <div class="matrix-responsive">
+                    <table class="matrix-13">
+                        <thead id="matrixHeader"></thead>
+                        <tbody id="matrixBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="score-box-layout">
+                    <div class="score-card">
+                        <h4>Global Category Total Score</h4>
+                        <div class="score-row"><span class="label-tag" style="color:#2e7d32;">GREEN</span><span class="score-val" id="scoreGlobalGreen">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#1565c0;">BLUE</span><span class="score-val" id="scoreGlobalBlue">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#616161;">GRAY</span><span class="score-val" id="scoreGlobalGray">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#fbc02d;">YELLOW</span><span class="score-val" id="scoreGlobalYellow">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#c62828;">RED</span><span class="score-val" id="scoreGlobalRed">0.00</span></div>
+                    </div>
+
+                    <div class="score-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--text-primary); padding-bottom: 8px;">
+                            <h4 style="margin: 0; border: none; padding: 0;">Object Specific Score</h4>
+                            <select id="selectScoreObject" style="font-family:'Roboto Mono'; font-size:0.75rem; height:26px; padding:2px 6px; border:1px solid #000;">
+                                </select>
+                        </div>
+                        <div class="score-row"><span class="label-tag" style="color:#2e7d32;">- GREEN</span><span class="score-val" id="scoreObjGreen">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#1565c0;">- BLUE</span><span class="score-val" id="scoreObjBlue">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#616161;">- GRAY</span><span class="score-val" id="scoreObjGray">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#fbc02d;">- YELLOW</span><span class="score-val" id="scoreObjYellow">0.00</span></div>
+                        <div class="score-row"><span class="label-tag" style="color:#c62828;">- RED</span><span class="score-val" id="scoreObjRed">0.00</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="matrix-panel-container" style="border-top: 1px solid var(--text-primary); padding-top: 24px;">
+                <div class="matrix-title">Matriks 2: Nilai Sudut Deviasi Spasial Murni ($\Delta \text{AZ}$)</div>
+                <div class="matrix-legend">Menampilkan Selisih Sudut Aktual Kompas Horizontal Tanpa Filter Klasifikasi Aspek</div>
+                <div class="matrix-responsive">
+                    <table class="matrix-13 matrix-raw-angle">
+                        <thead id="rawAngleHeader"></thead>
+                        <tbody id="rawAngleBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="md-card">
+                <div class="card-title">Kontrol Lapisan</div>
+                <div class="layer-list">
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 6: Latar Zodiak Astronomis (IAU)</div>
+                        <label class="switch"><input type="checkbox" id="layer6" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 4: Sektor Rendah (0° s/d ±30°) & Sirius</div>
+                        <label class="switch"><input type="checkbox" id="layer4" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 3: Sektor Menengah (±30° s/d ±60°)</div>
+                        <label class="switch"><input type="checkbox" id="layer3" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 2: Sektor Tinggi (±60° s/d ±90°)</div>
+                        <label class="switch"><input type="checkbox" id="layer2" checked><span class="slider"></span></label>
+                    </div>
+                    <div class="layer-item">
+                        <div class="layer-meta">Ring 1: Penanda Poros Titik Kutub Inti</div>
+                        <label class="switch"><input type="checkbox" id="layer1" checked><span class="slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="card-title">Chrono Time Telemetry</div>
+                <div class="clock-grid">
+                    <div class="time-box"><span>Selected Zone Time</span><div id="localClock" style="font-weight:700;">-</div></div>
+                    <div class="time-box"><span>UTC Target</span><div id="utcClock">-</div></div>
+                    <div class="time-box"><span>Julian Period</span><div id="jdClock">-</div></div>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="card-title">Telemetri Realtime Kompas</div>
+                <div id="monitorGrid" class="planet-monitor"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const zCanvas = document.getElementById('zenithCanvas');
+        const nCanvas = document.getElementById('nadirCanvas');
+        const zCtx = zCanvas.getContext('2d'); const nCtx = nCanvas.getContext('2d');
+        const cx = 440 / 2; const cy = 440 / 2;
+        const r6 = 195; const r4 = 160; const r3 = 125; const r2 = 90; const r1 = 55;  
+        const geoLat = -6.2088; const geoLon = 106.8456;
+
+        const matrixObjects = [
+            { name: 'SUN', symbol: '☉', color: 'var(--color-sun)', type: 'planet', id: 0 },
+            { name: 'MON', symbol: '☽', color: 'var(--color-moon)', type: 'planet', id: 1 },
+            { name: 'MER', symbol: '☿', color: 'var(--color-mercury)', type: 'planet', id: 2 },
+            { name: 'VEN', symbol: '♀', color: 'var(--color-venus)', type: 'planet', id: 3 },
+            { name: 'MAR', symbol: '♂', color: 'var(--color-mars)', type: 'planet', id: 4 },
+            { name: 'JUP', symbol: '♃', color: 'var(--color-jupiter)', type: 'planet', id: 5 },
+            { name: 'SAT', symbol: '♄', color: 'var(--color-saturn)', type: 'planet', id: 6 },
+            { name: 'URA', symbol: '♅', color: 'var(--color-uranus)', type: 'planet', id: 7 },
+            { name: 'NEP', symbol: '♆', color: 'var(--color-neptune)', type: 'planet', id: 8 },
+            { name: 'PLU', symbol: '♇', color: 'var(--color-pluto)', type: 'planet', id: 9 },
+            { name: 'SUI', symbol: '★', color: 'var(--color-sirius)', type: 'sirius' },
+            { name: 'ZEN', symbol: 'Z', color: '#ff3b30', type: 'poros_z', az: 0 },
+            { name: 'NAD', symbol: 'N', color: '#000000', type: 'poros_n', az: 0 }
+        ];
+
+        const aspectsDatabase = [
+            /* GREEN ZONE */
+            { name: 'Trigon', angle: 120, display: '[+4]', value: 4.0, zone: 'GREEN', sym: '△', cls: 'c-green' },
+            /* BLUE ZONE */
+            { name: 'Sekstil', angle: 60, display: '[+2]', value: 2.0, zone: 'BLUE', sym: '⚹', cls: 'c-blue' },
+            { name: 'Kuintil', angle: 72, display: '[+2.4]', value: 2.4, zone: 'BLUE', sym: '⬠', cls: 'c-blue' },
+            { name: 'Bikuintil', angle: 144, display: '[+4.8]', value: 4.8, zone: 'BLUE', sym: '⬟', cls: 'c-blue' },
+            { name: 'Novil', angle: 40, display: '[+1.3]', value: 1.3, zone: 'BLUE', sym: '◌', cls: 'c-blue' },
+            { name: 'Binovil', angle: 80, display: '[+2.6]', value: 2.6, zone: 'BLUE', sym: '◌', cls: 'c-blue' },
+            /* GRAY ZONE */
+            { name: 'Konjungsi', angle: 0, display: '[=12]', value: 12.0, zone: 'GRAY', sym: '☌', cls: 'c-gray' },
+            { name: 'Semi-sekstil', angle: 30, display: '[=1]', value: 1.0, zone: 'GRAY', sym: '⚺', cls: 'c-gray' },
+            { name: 'Septil', angle: 51.43, display: '[=1.7]', value: 1.7, zone: 'GRAY', sym: '⟐', cls: 'c-gray' },
+            { name: 'Biseptil', angle: 102.86, display: '[=3.4]', value: 3.4, zone: 'GRAY', sym: '⟑', cls: 'c-gray' },
+            { name: 'Triseptil', angle: 154.29, display: '[=5.1]', value: 5.1, zone: 'GRAY', sym: '⟒', cls: 'c-gray' },
+            /* YELLOW ZONE */
+            { name: 'Semi-kuadrat', angle: 45, display: '[#1.5]', value: 1.5, zone: 'YELLOW', sym: '∠', cls: 'c-yellow' },
+            { name: 'Kuinkunks', angle: 150, display: '[#5]', value: 5.0, zone: 'YELLOW', sym: '⚻', cls: 'c-yellow' },
+            /* RED ZONE */
+            { name: 'Kuadrat', angle: 90, display: '[-3]', value: -3.0, zone: 'RED', sym: '□', cls: 'c-red' },
+            { name: 'Seskikuadrat', angle: 135, display: '[-4.5]', value: -4.5, zone: 'RED', sym: '⚼', cls: 'c-red' },
+            { name: 'Oposisi', angle: 180, display: '[-6]', value: -6.0, zone: 'RED', sym: '☍', cls: 'c-red' }
+        ];
+
+        const iauZodiacs = [
+            { name: "ARI", days: 25 }, { name: "TAU", days: 37 }, { name: "GEM", days: 31 },
+            { name: "CAN", days: 20 }, { name: "LEO", days: 37 }, { name: "VIR", days: 45 },
+            { name: "LIB", days: 23 }, { name: "SCO", days: 7 },  { name: "OPH", days: 18 }, 
+            { name: "SGR", days: 32 }, { name: "CAP", days: 28 }, { name: "AQR", days: 24 },
+            { name: "PSC", days: 38 }
+        ];
+
+        // Pengisian Dropdown Objek untuk Sektor Skor Spesifik
+        const objSelector = document.getElementById('selectScoreObject');
+        matrixObjects.forEach((o, index) => {
+            let opt = document.createElement('option'); opt.value = index; opt.innerText = `${o.symbol} ${o.name}`;
+            if(o.name === 'SUN') opt.selected = true;
+            objSelector.appendChild(opt);
+        });
+
+        let matrixCalculatedData = [];
+        let globalSiriusAzRad = 0;
+
+        const DateTime = luxon.DateTime;
+        let internalChronoTime = DateTime.local();
+        let isWarpPlaying = false;
+        let lastEngineTick = 0;
+
+        document.getElementById('btnPlay').addEventListener('click', function() {
+            isWarpPlaying = !isWarpPlaying; this.innerText = isWarpPlaying ? "⏸ PAUSE" : "▶ PLAY";
+            this.classList.toggle('active-play', isWarpPlaying);
+        });
+        document.getElementById('btnReset').addEventListener('click', function() { internalChronoTime = DateTime.local().setZone(document.getElementById('selectTZ').value); syncInputFields(internalChronoTime); });
+        document.getElementById('btnForward').addEventListener('click', function() { internalChronoTime = executeWarpStep(internalChronoTime, 1); syncInputFields(internalChronoTime); });
+        document.getElementById('btnBack').addEventListener('click', function() { internalChronoTime = executeWarpStep(internalChronoTime, -1); syncInputFields(internalChronoTime); });
+        document.getElementById('inputDate').addEventListener('change', updateTimeFromInputs);
+        document.getElementById('inputTime').addEventListener('change', updateTimeFromInputs);
+        document.getElementById('selectTZ').addEventListener('change', function() { internalChronoTime = internalChronoTime.setZone(this.value); syncInputFields(internalChronoTime); });
+        objSelector.addEventListener('change', () => generateWeighted13x13Matrix()); // Re-render kalkulasi seketika dropdown berubah
+
+        function syncInputFields(chronoObj) { document.getElementById('inputDate').value = chronoObj.toISODate(); document.getElementById('inputTime').value = chronoObj.toFormat('HH:mm:ss'); }
+        function updateTimeFromInputs() { if (isWarpPlaying) return; const dateVal = document.getElementById('inputDate').value; const timeVal = document.getElementById('inputTime').value; const tzVal = document.getElementById('selectTZ').value; const testTime = DateTime.fromISO(`${dateVal}T${timeVal}`, { zone: tzVal }); if (testTime.isValid) internalChronoTime = testTime; }
+
+        function executeWarpStep(chronoObj, direction = 1) {
+            const stepType = document.getElementById('selectStep').value;
+            switch(stepType) {
+                case 'N':  return chronoObj.plus({ seconds: direction * 1 });
+                case '1M': return chronoObj.plus({ minutes: direction * 1 });
+                case '1H': return chronoObj.plus({ hours: direction * 1 });
+                case '1D': return chronoObj.plus({ days: direction * 1 });
+                default:   return chronoObj;
+            }
+        }
+
+        function getZenithCoords(radius, angle) { return { x: cx + radius * Math.sin(angle), y: cy - radius * Math.cos(angle) }; }
+        function getNadirCoords(radius, angle) { return { x: cx - radius * Math.sin(angle), y: cy - radius * Math.cos(angle) }; }
+
+        function startRealtimeChronoLoop() {
+            function frame(timestamp) {
+                if (window.swe) {
+                    const selectedZone = document.getElementById('selectTZ').value;
+                    if (isWarpPlaying) {
+                        if (!lastEngineTick) lastEngineTick = timestamp;
+                        const elapsed = timestamp - lastEngineTick;
+                        if (elapsed >= 1000) { internalChronoTime = executeWarpStep(internalChronoTime, 1).setZone(selectedZone); syncInputFields(internalChronoTime); lastEngineTick = timestamp; }
+                    } else { lastEngineTick = 0; updateTimeFromInputs(); }
+
+                    if (internalChronoTime.isValid) {
+                        document.getElementById('localClock').innerText = internalChronoTime.toFormat('HH:mm:ss ZZZZ');
+                        const utcChrono = internalChronoTime.setZone('UTC');
+                        document.getElementById('utcClock').innerText = utcChrono.toFormat('yyyy-MM-dd HH:mm:ss') + ' UTC';
+                        const jd = window.swe.julday(utcChrono.year, utcChrono.month, utcChrono.day, utcChrono.hour + (utcChrono.minute / 60) + (utcChrono.second / 3600));
+                        document.getElementById('jdClock').innerText = jd.toFixed(5);
+
+                        const gmstHour = window.swe.sidtime(jd); const lstRad = ((gmstHour * 15 + geoLon) * Math.PI) / 180;
+
+                        matrixCalculatedData = matrixObjects.map(obj => {
+                            let raRad, decRad;
+                            if (obj.type === 'planet') {
+                                const res = window.swe.calc_ut(jd, obj.id, 2); 
+                                const ra = Math.atan2(Math.sin((res[0]*Math.PI)/180) * Math.cos(23.439291*Math.PI/180) - Math.tan((res[1]*Math.PI)/180) * Math.sin(23.439291*Math.PI/180), Math.cos((res[0]*Math.PI)/180));
+                                const dec = Math.asin(Math.sin((res[1]*Math.PI)/180) * Math.cos(23.439291*Math.PI/180) + Math.cos((res[1]*Math.PI)/180) * Math.sin(23.439291*Math.PI/180) * Math.sin((res[0]*Math.PI)/180));
+                                raRad = ra; decRad = dec;
+                            } else if (obj.type === 'sirius') {
+                                raRad = (6.752477 * 15 * Math.PI) / 180; decRad = (-16.725417 * Math.PI) / 180;
+                            }
+                            if (obj.type === 'planet' || obj.type === 'sirius') {
+                                const ha = lstRad - raRad;
+                                const alt = Math.asin(Math.sin((geoLat*Math.PI)/180) * Math.sin(decRad) + Math.cos((geoLat*Math.PI)/180) * Math.cos(decRad) * Math.cos(ha));
+                                let az = Math.atan2(-Math.sin(ha), Math.tan(decRad) * Math.cos((geoLat*Math.PI)/180) - Math.sin((geoLat*Math.PI)/180) * Math.cos(ha));
+                                if (az < 0) az += 2 * Math.PI;
+                                return {
+                                    ...obj, az: az * 180 / Math.PI, alt: alt * 180 / Math.PI, azRad: az,
+                                    zRadius: r4 - (((alt * 180 / Math.PI) / 90) * (r4 - r1)), nRadius: r4 - ((Math.abs(alt * 180 / Math.PI) / 90) * (r4 - r1)),
+                                    earthLat: (decRad * 180) / Math.PI, earthLon: geoLon - (ha * 180 / Math.PI), isZenith: alt >= 0
+                                };
+                            } else {
+                                return { ...obj, azRad: 0, alt: obj.type === 'poros_z' ? 90 : -90, az: 0, zRadius: 0, nRadius: 0, earthLat: geoLat, earthLon: geoLon, isZenith: obj.type === 'poros_z' };
+                            }
+                        });
+
+                        const siriusObj = matrixCalculatedData.find(o => o.type === 'sirius'); if (siriusObj) globalSiriusAzRad = siriusObj.azRad;
+
+                        generateWeighted13x13Matrix();
+                        generateRawAngle13x13Matrix();
+                        renderDualLayout();
+                        updateSideMonitor();
+                    }
+                }
+                requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+        }
+
+        // GENERATOR MATRIKS 1 DENGAN FILTER REVISI ORB = 3° DAN KALKULATOR TOTAL SCORE INTEGRAL
+        function generateWeighted13x13Matrix() {
+            const header = document.getElementById('matrixHeader'); const body = document.getElementById('matrixBody'); 
+            
+            // REVISI: Orb diperketat murni menjadi 3 derajat sesuai instruksi
+            const maxOrb = 3.0; 
+
+            // Wadah Accumulator Score Global Sektoral
+            let globalScores = { GREEN: 0, BLUE: 0, GRAY: 0, YELLOW: 0, RED: 0 };
+            
+            // Wadah Accumulator Score Khusus Target Objek terpilih dari dropdown
+            const targetObjIdx = parseInt(objSelector.value);
+            let objectScores = { GREEN: 0, BLUE: 0, GRAY: 0, YELLOW: 0, RED: 0 };
+
+            let headerHTML = '<tr><th>OBJ</th>'; matrixCalculatedData.forEach(obj => { headerHTML += `<th>${obj.symbol}</th>`; }); headerHTML += '</tr>'; header.innerHTML = headerHTML;
+            let bodyHTML = '';
+
+            for (let i = 0; i < matrixCalculatedData.length; i++) {
+                const rowObj = matrixCalculatedData[i]; bodyHTML += `<tr><td class="row-header">${rowObj.symbol} ${rowObj.name}</td>`;
+                for (let j = 0; j < matrixCalculatedData.length; j++) {
+                    const colObj = matrixCalculatedData[j];
+                    if (i === j) { bodyHTML += `<td class="diagonal-cell"></td>`; }
+                    else if (j > i) {
+                        // ▲ KANAN-ATAS: SEKTOR TERISOLASI ZENITH (ALT >= 0°)
+                        if (rowObj.type === 'poros_n' || colObj.type === 'poros_n' || !rowObj.isZenith || !colObj.isZenith) { bodyHTML += `<td class="inactive-zone">×</td>`; }
+                        else {
+                            let diff = Math.abs(rowObj.az - colObj.az); if (diff > 180) diff = 360 - diff;
+                            let matched = null; let minOrb = maxOrb;
+                            aspectsDatabase.forEach(asp => { const orb = Math.abs(diff - asp.angle); if (orb <= minOrb) { minOrb = orb; matched = asp; } });
+                            
+                            if (matched) { 
+                                bodyHTML += `<td class="${matched.cls}"><span class="point-display">${matched.display}</span><span class="symbol-lbl">${matched.sym}</span></td>`; 
+                                // Injeksi Nilai ke Accumulator Global (Hanya dihitung sekali per pasang objek unik)
+                                globalScores[matched.zone] += matched.value;
+                                // Injeksi ke Target Objek jika ID sel berpapasan dengan pilihan dropdown pengguna
+                                if(i === targetObjIdx || j === targetObjIdx) { objectScores[matched.zone] += matched.value; }
+                            } else { bodyHTML += `<td>${diff.toFixed(0)}°</td>`; }
+                        }
+                    } else {
+                        // ▼ KIRI-BAWAH: SEKTOR TERISOLASI NADIR (ALT < 0°)
+                        if (rowObj.type === 'poros_z' || colObj.type === 'poros_z' || rowObj.isZenith || colObj.isZenith) { bodyHTML += `<td class="inactive-zone">×</td>`; }
+                        else {
+                            let diff = Math.abs(rowObj.az - colObj.az); if (diff > 180) diff = 360 - diff;
+                            let matched = null; let minOrb = maxOrb;
+                            aspectsDatabase.forEach(asp => { const orb = Math.abs(diff - asp.angle); if (orb <= minOrb) { minOrb = orb; matched = asp; } });
+                            
+                            if (matched) { 
+                                bodyHTML += `<td class="${matched.cls}"><span class="point-display">${matched.display}</span><span class="symbol-lbl">${matched.sym}</span></td>`; 
+                                // Injeksi Nilai ke Accumulator Global
+                                globalScores[matched.zone] += matched.value;
+                                if(i === targetObjIdx || j === targetObjIdx) { objectScores[matched.zone] += matched.value; }
+                            } else { bodyHTML += `<td>${diff.toFixed(0)}°</td>`; }
+                        }
+                    }
+                }
+                bodyHTML += '</tr>';
+            }
+            body.innerHTML = bodyHTML;
+
+            // RENDER TELEMETRI TOTAL SCORE INTERAKTIF KE PAPAN INTERFACE DATA HTML
+            document.getElementById('scoreGlobalGreen').innerText = globalScores.GREEN.toFixed(1);
+            document.getElementById('scoreGlobalBlue').innerText = globalScores.BLUE.toFixed(1);
+            document.getElementById('scoreGlobalGray').innerText = globalScores.GRAY.toFixed(1);
+            document.getElementById('scoreGlobalYellow').innerText = globalScores.YELLOW.toFixed(1);
+            document.getElementById('scoreGlobalRed').innerText = globalScores.RED.toFixed(1);
+
+            document.getElementById('scoreObjGreen').innerText = objectScores.GREEN.toFixed(1);
+            document.getElementById('scoreObjBlue').innerText = objectScores.BLUE.toFixed(1);
+            document.getElementById('scoreObjGray').innerText = objectScores.GRAY.toFixed(1);
+            document.getElementById('scoreObjYellow').innerText = objectScores.YELLOW.toFixed(1);
+            document.getElementById('scoreObjRed').innerText = objectScores.RED.toFixed(1);
+        }
+
+        function generateRawAngle13x13Matrix() {
+            const rawHeader = document.getElementById('rawAngleHeader'); const rawBody = document.getElementById('rawAngleBody');
+            let headerHTML = '<tr><th>OBJ</th>'; matrixCalculatedData.forEach(obj => { headerHTML += `<th>${obj.symbol}</th>`; }); headerHTML += '</tr>'; rawHeader.innerHTML = headerHTML;
+            let bodyHTML = '';
+            for (let i = 0; i < matrixCalculatedData.length; i++) {
+                const rowObj = matrixCalculatedData[i]; bodyHTML += `<tr><td class="row-header">${rowObj.symbol} ${rowObj.name}</td>`;
+                for (let j = 0; j < matrixCalculatedData.length; j++) {
+                    const colObj = matrixCalculatedData[j];
+                    if (i === j) { bodyHTML += `<td class="diagonal-cell"></td>`; }
+                    else { let diff = Math.abs(rowObj.az - colObj.az); if (diff > 180) diff = 360 - diff; bodyHTML += `<td>${diff.toFixed(1)}°</td>`; }
+                }
+                bodyHTML += '</tr>';
+            }
+            rawBody.innerHTML = bodyHTML;
+        }
+
+        function updateSideMonitor() {
+            const monitorGrid = document.getElementById('monitorGrid');
+            monitorGrid.innerHTML = matrixCalculatedData.filter(p => p.type !== 'poros_z' && p.type !== 'poros_n').map(p => {
+                const mapUrl = `http://googleusercontent.com/maps.google.com/maps?q=${p.earthLat.toFixed(6)},${p.earthLon.toFixed(6)}`;
+                return `
+                    <div class="p-stat" style="border-left-color: ${p.isZenith ? '#000000' : '#d0d0d0'}">
+                        <div class="p-icon-dot" style="background-color: ${p.color}"></div>
+                        <div class="p-name-tag">${p.name}</div>
+                        <div class="p-coords-tag">AZ:${p.az.toFixed(1)}° ALT:${p.alt.toFixed(1)}°<br>GEO:${p.earthLat.toFixed(2)}°, ${p.earthLon.toFixed(2)}°</div>
+                        <a href="${mapUrl}" target="_blank" class="maps-btn">MAP</a>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderDualLayout() {
+            const showL1 = document.getElementById('layer1').checked; const showL2 = document.getElementById('layer2').checked; const showL3 = document.getElementById('layer3').checked; const showL4 = document.getElementById('layer4').checked; const showL6 = document.getElementById('layer6').checked;
+            zCtx.clearRect(0, 0, 440, 440); nCtx.clearRect(0, 0, 440, 440);
+
+            [ { ctx: zCtx, label: 'ZENITH', isZenithMode: true }, { ctx: nCtx, label: 'NADIR', isZenithMode: false } ].forEach(target => {
+                const c = target.ctx; const coordFunc = target.isZenithMode ? getZenithCoords : getNadirCoords;
+                c.beginPath(); c.moveTo(cx, cy - r4); c.lineTo(cx, cy + r4); c.moveTo(cx - r4, cy); c.lineTo(cx + r4, cy); c.strokeStyle = '#f5f5f5'; c.stroke();
+
+                if (showL6) {
+                    drawRingCircle(c, r6, '#e5e5e5', 1); let curA = globalSiriusAzRad;
+                    iauZodiacs.forEach(zod => {
+                        let sweep = (zod.days / 365) * 2 * Math.PI;
+                        c.beginPath(); c.moveTo(coordFunc(r6, curA).x, coordFunc(r6, curA).y); c.lineTo(coordFunc(r4, curA).x, coordFunc(r4, curA).y); c.strokeStyle = '#f5f5f5'; c.stroke();
+                        let pTxt = coordFunc(r6 - 14, curA + (sweep / 2)); c.fillStyle = '#a0a0a5'; c.font = '500 8px Helvetica, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(zod.name, pTxt.x, pTxt.y); curA += sweep;
+                    });
+                }
+                if (showL4) { drawRingCircle(c, r4, '#000000', 1.5); drawCompassScaleGrid(c, r4, r3, '#e5e5e5', '#707072', 1, globalSiriusAzRad, target.isZenithMode); }
+                if (showL3) { drawRingCircle(c, r3, '#cccccc', 1); drawCompassScaleGrid(c, r3, r2, '#f5f5f5', '#909095', 13, globalSiriusAzRad, target.isZenithMode); }
+                if (showL2) { drawRingCircle(c, r2, '#cccccc', 1); drawCompassScaleGrid(c, r2, r1, '#f5f5f5', '#909095', 25, globalSiriusAzRad, target.isZenithMode); }
+
+                const directions = [ { angle: 0, text: 'N', color: '#ff3b30' }, { angle: Math.PI / 2, text: target.isZenithMode ? 'E' : 'W', color: '#000000' }, { angle: Math.PI, text: 'S', color: '#000000' }, { angle: (3 * Math.PI) / 2, text: target.isZenithMode ? 'W' : 'E', color: '#000000' } ];
+                directions.forEach(dir => {
+                    let coord = { x: cx + (r4 + 16) * (target.isZenithMode ? Math.sin(dir.angle) : -Math.sin(dir.angle)), y: cy - (r4 + 16) * Math.cos(dir.angle) };
+                    c.fillStyle = dir.color; c.font = '900 11px Helvetica, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(dir.text, coord.x, coord.y);
+                });
+                if (showL1) { drawRingCircle(c, r1, '#000000', 1); drawPlanetNode(c, cx, cy, target.label[0], '#000000', target.label, '#ffffff', '#000000'); }
+            });
+
+            matrixCalculatedData.forEach(p => {
+                if (p.type.startsWith('poros')) return;
+                let parsedColor = p.color.includes('var') ? varColor(p.color.match(/\(([^)]+)\)/)[1]) : p.color;
+                if (p.isZenith && ((p.alt < 30 && showL4) || (p.alt >= 30 && p.alt < 60 && showL3) || (p.alt >= 60 && p.alt <= 90 && showL2))) {
+                    let coord = getZenithCoords(p.zRadius, p.azRad); drawPlanetNode(zCtx, coord.x, coord.y, p.symbol, '#000000', p.name, '#ffffff', parsedColor);
+                } else if (!p.isZenith && ((Math.abs(p.alt) < 30 && showL4) || (Math.abs(p.alt) >= 30 && Math.abs(p.alt) < 60 && showL3) || (Math.abs(p.alt) >= 60 && Math.abs(p.alt) <= 90 && showL2))) {
+                    let coord = getNadirCoords(p.nRadius, p.azRad); drawPlanetNode(nCtx, coord.x, coord.y, p.symbol, '#000000', p.name, '#ffffff', parsedColor);
+                }
+            });
+        }
+
+        function drawRingCircle(c, radius, color, width) { c.beginPath(); c.arc(cx, cy, radius, 0, 2 * Math.PI); c.strokeStyle = color; c.lineWidth = width; c.stroke(); }
+        function drawCompassScaleGrid(c, outerRadius, innerRadius, lineColor, textColor, startNumber, anchorOffset, isZenithMode) {
+            const coordFunc = isZenithMode ? getZenithCoords : getNadirCoords;
+            for (let i = 0; i < 12; i++) {
+                let angle = (i * 30) * Math.PI / 180 + anchorOffset;
+                c.beginPath(); c.moveTo(coordFunc(outerRadius, angle).x, coordFunc(outerRadius, angle).y); c.lineTo(coordFunc(innerRadius, angle).x, coordFunc(innerRadius, angle).y); c.strokeStyle = lineColor; c.stroke();
+                let pText = coordFunc(innerRadius + ((outerRadius - innerRadius) / 2), (i * 30 + 15) * Math.PI / 180 + anchorOffset);
+                c.fillStyle = textColor; c.font = '500 8px Helvetica, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText((startNumber + i), pText.x, pText.y); 
+            }
+        }
+        function drawPlanetNode(c, x, y, symbol, strokeColor, label, bgColor, brandBorderColor = '#000000') {
+            c.beginPath(); c.arc(x, y, 11, 0, 2 * Math.PI); c.fillStyle = bgColor; c.fill(); c.strokeStyle = brandBorderColor; c.lineWidth = 1.5; c.stroke();
+            c.fillStyle = '#000000'; c.font = '11px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(symbol, x, y + 0.5);
+            c.fillStyle = '#000000'; c.font = 'bold 8px Helvetica, Arial'; c.fillText(label.toUpperCase(), x, y - 15);
+        }
+        function varColor(varName) { return getComputedStyle(document.documentElement).getPropertyValue('--' + varName.trim()).trim(); }
+    </script>
+</body>
+</html>
