@@ -1,0 +1,404 @@
+🚀 MASTER PROMPT OPTIMIZED: Konversi Sistem Modern → Web Statis Modular (Production-Ready)
+🎯 TUJUAN
+Mengkonversi sistem/aplikasi/web app modern (React, Vue, Next.js, Svelte, AI Studio, Vite, dll) menjadi web statis vanilla HTML/CSS/JS yang:
+Self-contained (semua aset lokal, offline-ready)
+Modular namespace (terorganisir tanpa polusi global)
+Double-click ready (jalan dari file:// tanpa server)
+Production quality (error handling, fallback, dokumentasi)
+📥 INPUT
+Sebutkan: "Konversi [NAMA_FOLDER/SOURCE] menjadi web statis modular production-ready"
+Sumber yang didukung:
+Project React / Vue / Svelte / Angular / Next.js / Nuxt
+Project Vite / Webpack / AI Studio / Bolt / v0 / Lovable
+Template npm-based (npm run dev)
+Single-file HTML+JS lama
+Code dump langsung
+📦 OUTPUT STRUCTURE
+Struktur Dasar (Wajib)
+code
+Code
+📁 [nama-project]/
+├── index.html              ← Entry point
+├── README.md               ← Dokumentasi auto-generated
+├── 📁 css/
+│   └── style.css           ← Semua styling
+├── 📁 js/
+│   ├── app.js              ← Namespace + init (entry point)
+│   ├── store.js            ← State, config, constants
+│   ├── [domain1].js        ← Logic + render per domain/komponen
+│   ├── [domain2].js        ← (Misal: calculator.js, mapEngine.js)
+│   └── ui.js               ← DOM bindings & event handlers
+├── 📁 assets/
+│   ├── 📁 images/          ← Semua gambar
+│   ├── 📁 fonts/           ← Font custom
+│   └── 📁 data/            ← JSON statis, CSV, dll
+├── 📁 lib/                 ← Library eksternal (lokal, bukan CDN)
+│   └── (chart.js, leaflet.css, dll - jika diperlukan)
+└── .gitignore
+Aturan Fleksibilitas Struktur
+Kondisi	Penyesuaian
+Total JS < 200 baris	Boleh gabung jadi app.js + style.css minimal
+Aplikasi > 5 komponen	Pisah per komponen/domain, bukan per jenis fungsi
+Game/Animasi berat	Struktur bebas: engine.js, renderer.js, input.js
+Data eksternal wajib	Simpan di assets/data/ sebagai JSON, load via <script> tag
+🔧 ATURAN TEKNIS WAJIB
+✅ HARUS DITERAPKAN
+Kategori	Standar
+Module System	Classic scripts dengan Single Global Namespace via IIFE
+Namespace Pattern	`window.App = window.App
+Tag Script	<script src="js/store.js"></script> (bukan module)
+Loading Order	Eksplisit di HTML: dependensi → komponen → orchestrator
+Dependencies	Zero external dependency. Library wajib disimpan lokal di /lib/
+Offline-First	Semua aset (font, icon, library, data) di-bundle lokal
+Build Step	Tidak ada. Production-ready langsung
+Server	Tidak diperlukan. file:// langsung berfungsi
+Framework	Vanilla JS murni. React/Vue/jQuery → diganti penuh
+Error Handling	try-catch di init, DOM existence check, fallback messages
+State Management	Objek App.store terpusat, fungsi getter/setter eksplisit
+❌ DILARANG KERAS
+Kategori	Larangan
+ES Modules	import/export, <script type="module">
+Polusi Global	Variabel mentah di window tanpa namespace
+CDN Hotlinking	<script src="https://cdn..."> tanpa fallback lokal
+Build Tools	package.json, node_modules/, Vite, Webpack config
+Framework Artifacts	JSX, useState, ref, v-model, SFC (.vue/.svelte)
+Server-dependent	fetch() ke endpoint, localhost, SSR
+Unicode Escape	\u0634 → tulis langsung karakter aslinya
+🧩 ARSITEKTUR MODUL (PATTERN)
+Namespace Pattern (WAJIB)
+code
+JavaScript
+// js/store.js
+window.App = window.App || {};
+(function(ns) {
+    'use strict';
+    
+    ns.store = {
+        data: [],
+        config: { /* ... */ },
+        getData: function() { return this.data; },
+        setData: function(newData) { /* validation */ }
+    };
+    
+})(window.App);
+Pembagian Tanggung Jawab File
+File	Tanggung Jawab	Isi Tipikal
+app.js	Namespace root + init + error boundary	App.init(), orchestrator, fallback handler
+store.js	State management	Data, state object, getter/setter, constants
+[domain].js	Business logic + rendering domain	Kalkulasi, algoritma, Canvas/SVG drawing
+ui.js	DOM interaction	Event binding, DOM updates, form handling
+[component].js	Komponen UI mandiri	Render + behavior satu komponen (Modal, Chart, Map)
+Aturan Penempatan Fungsi Campuran
+Jika fungsi melakukan logic + render + DOM update, prioritaskan:
+Pisah jika memungkinkan (logic murni → domain.js, DOM → ui.js)
+Gabung di domain.js jika pemisahan merusak kohesi (contoh: game loop, real-time chart)
+Jangan duplikasi logic di ui.js. ui.js hanya memanggil fungsi dari domain
+🔄 PROSES KONVERSI (8 LANGKAH)
+1. ANALISIS SUMBER
+Scan semua file (HTML, JS, CSS, components, assets)
+Mapping fitur: apa yang dilakukan sistem?
+Catat: routing, state global, API calls, komponen, animasi
+Identifikasi library eksternal yang dipakai
+2. EKSTRAKSI ASET
+Gambar: Pindahkan ke assets/images/, update path relatif
+Font: Download dan simpan di assets/fonts/, update @font-face
+Library: Download production version ke lib/ (Chart.js, Leaflet, D3, dll)
+Data: Ubah API calls menjadi JSON statis di assets/data/
+3. DEKOMPOSISI STATE & LOGIC
+Identifikasi semua state global → kandidat store.js
+Identifikasi fungsi murni (input → output) → kandidat [domain].js
+Identifikasi side effects (DOM, event) → kandidat ui.js
+Buat dependency graph: siapa butuh siapa?
+4. KONVERSI FRAMEWORK → VANILLA
+Framework Pattern	Konversi Vanilla
+useState(init)	App.store.state = init + manual re-render
+useEffect(fn, [])	Panggil fn() di App.init()
+ref(null)	document.querySelector() / App.store.refs.el
+JSX <div>{val}</div>	element.textContent = val
+v-for/v-if	Loop for + if + innerHTML atau createElement
+@click/onClick	element.addEventListener('click', fn)
+Component .vue/.jsx	Fungsi factory createComponent() di file terpisah
+react-router	Hash-based routing sederhana di app.js
+5. BANGUN STRUKTUR FILE
+Urutan pembangunan:
+store.js → namespace + state + getter/setter
+[domain].js → fungsi logic murni
+Komponen tambahan (jika ada)
+ui.js → DOM binding + event handlers
+app.js → namespace root, init(), error boundary
+index.html → struktur minimal, load script berurutan
+style.css → gabung semua style, hapus CSS-in-JS
+6. HANDLE EDGE CASES
+Routing SPA: Implementasikan hash router sederhana
+Lazy Loading: Ganti dengan conditional script loading atau inline
+Environment Variables: Hardcode di store.js dengan komentar jelas
+SSR/Static Generation: Abaikan, fokus pada client-side rendering
+CSS Modules: Flatten ke class selector unik manual
+TypeScript: Strip types, tambahkan JSDoc comments
+7. ERROR HANDLING & FALLBACK
+Tambahkan di app.js:
+code
+JavaScript
+ns.init = function() {
+    try {
+        ns.store.initialize();
+        ns.domain.init();
+        ns.ui.bindEvents();
+        console.log('✅ App initialized successfully');
+    } catch (error) {
+        console.error('❌ App initialization failed:', error);
+        ns.showFallbackError(error);
+    }
+};
+
+ns.showFallbackError = function(error) {
+    document.body.innerHTML = `
+        <div style="padding:2rem;text-align:center;font-family:sans-serif;">
+            <h2>⚠️ Application Error</h2>
+            <p>${error.message}</p>
+            <small>Check browser console (F12) for details</small>
+        </div>`;
+};
+8. FINALISASI & DOKUMENTASI
+Buat README.md dengan:
+Deskripsi singkat aplikasi
+Cara menjalankan: "Double-click index.html"
+Struktur file dan penjelasan
+Daftar fitur
+Catatan browser compatibility
+Screenshot (jika memungkinkan)
+Buat .gitignore: node_modules/, .DS_Store, *.log
+🔤 PENANGANAN ENCODING & KARAKTER
+Kasus	Aturan
+Simbol khusus (°, •, ☉, ☽, ☿)	Tulis langsung di JS string
+Teks non-Latin (Arab, Mandarin, Jepang, dll)	Tulis langsung, jangan Unicode escape
+Unicode escape di source (\u0634)	Decode ke karakter asli
+HTML entities (&deg;)	Ganti ke karakter asli di JS, entity di HTML dibolehkan
+Encoding file	UTF-8 tanpa BOM
+Emoji & simbol modern	Tulis langsung, pastikan font fallback
+👀 PREVIEW & TESTING
+Metode Testing
+Level	Metode	Detail
+Basic	Double-click index.html	Cek loading, rendering awal
+Fungsional	Manual checklist	Semua tombol, form, animasi, navigasi
+Error	Console (F12)	Harus bersih, tidak ada error merah
+Offline	Airplane mode	Putus internet, reload, harus tetap jalan
+Browser	Chrome + Firefox + Edge	Test di minimal 2 browser
+Responsive	Resize + mobile view	Layout tidak rusak
+Testing Checklist (Auto-generate saat konversi)
+code
+Markdown
+## 🧪 Testing Checklist
+- [ ] Halaman terbuka tanpa error
+- [ ] Semua tombol berfungsi
+- [ ] Form input & validasi
+- [ ] Navigasi/routing (jika ada)
+- [ ] Animasi/transisi berjalan
+- [ ] Data loading (jika ada)
+- [ ] Error state tampil
+- [ ] Responsive di mobile
+- [ ] Offline mode berfungsi
+- [ ] Console bersih
+🧹 BERSIHKAN ARTEFAK (WAJIB HAPUS)
+File/Folder yang Harus Dihapus
+code
+Code
+❌ package.json
+❌ package-lock.json / yarn.lock
+❌ node_modules/
+❌ vite.config.js / webpack.config.js
+❌ next.config.js / nuxt.config.js
+❌ tsconfig.json
+❌ .env / .env.example
+❌ .eslintrc / .prettierrc
+❌ src/ (setelah logic diekstrak)
+❌ components/ (setelah logic diekstrak)
+❌ .next/ / dist/ / build/
+❌ metadata.json (kecuali berisi info penting)
+Yang Harus Dibuat Baru
+code
+Code
+✅ README.md (dokumentasi baru)
+✅ .gitignore (minimal: node_modules/ .DS_Store *.log)
+✅ CEKLIS KELULUSAN (15 POIN)
+No	Cek	Status
+1	Double-click index.html langsung jalan	☐
+2	Console browser (F12) bersih, 0 error	☐
+3	Semua fitur utama berfungsi penuh	☐
+4	Single global namespace (tidak ada variabel polusi)	☐
+5	Tidak ada type="module" di HTML	☐
+6	Tidak ada import/export di JS	☐
+7	Tidak ada package.json tersisa	☐
+8	Semua library dari /lib/ lokal, tidak ada CDN hotlink	☐
+9	Semua aset (gambar, font, data) ada di /assets/	☐
+10	Simbol & teks non-Latin tampil sempurna	☐
+11	Error handling berfungsi (test dengan corrupt state)	☐
+12	.gitignore ada dengan isi minimal	☐
+13	README.md baru ter-generate	☐
+14	Offline-ready (test dengan airplane mode)	☐
+15	Responsif di mobile dan desktop	☐
+📦 LAPORAN HASIL KONVERSI
+code
+Code
+📊 LAPORAN KONVERSI
+
+📁 Struktur Output:
+✅ index.html          : [OK / ISSUE]
+✅ css/style.css       : [OK / ISSUE]
+✅ js/app.js           : [OK / ISSUE]
+✅ js/store.js         : [OK / ISSUE]
+✅ js/[domain].js      : [OK / ISSUE]
+✅ js/ui.js            : [OK / ISSUE]
+✅ assets/             : [OK / ISSUE]
+✅ lib/                : [OK / ISSUE]
+✅ README.md           : [OK / ISSUE]
+✅ .gitignore          : [OK / ISSUE]
+
+🔍 Browser Test:
+• Console Errors      : [NONE / LIST]
+• Features Working    : [ALL / BROKEN LIST]
+• Offline Mode        : [PASS / FAIL]
+• Responsive          : [PASS / FAIL]
+
+🧹 Cleanup:
+• Framework Artifacts : [CLEANED / REMAINING]
+• CDN References      : [NONE / COUNT REMAINING]
+• Unicode Issues      : [NONE / LIST]
+
+📝 Notes:
+[Additional observations, browser-specific issues, recommendations]
+🚀 FORMAT PROMPT SIAP PAKAI
+Konversi Project Folder
+code
+Code
+Konversi folder [NAMA_FOLDER] menjadi web statis modular production-ready.
+
+Requirement:
+- Single global namespace (window.App), bukan polusi global
+- Semua library di-bundle lokal di /lib/, zero CDN dependency
+- Self-contained, offline-ready, double-click index.html langsung jalan
+- Struktur modular dengan error handling dan fallback
+- Konversi total framework → vanilla JS
+- Generate README.md dokumentasi
+- Bersihkan semua build artifacts (package.json, node_modules, dll)
+Konversi Code Dump
+code
+Code
+Ini kode [DESKRIPSI_SISTEM] dari [FRAMEWORK].
+Konversi jadi web statis vanilla HTML/CSS/JS production-ready.
+
+Rules:
+- Namespace App.* untuk semua modul (store, logic, ui)
+- Classic scripts, bukan ES module
+- Bundle semua dependency ke /lib/ lokal
+- Double-click ready, offline-capable
+- Error handling di semua layer
+- Hapus semua jejak framework & build tools
+- Generate README.md baru
+Post-Konversi (Testing & Cleanup)
+code
+Code
+Setelah konversi, lakukan:
+1. Buat README.md dengan struktur file & cara menjalankan
+2. Test double-click di 2 browser berbeda
+3. Test offline mode (airplane mode)
+4. Cek console error - harus bersih
+5. Verifikasi semua fitur dengan checklist
+6. Bersihkan sisa framework artifacts
+7. Laporkan hasil dengan format laporan lengkap
+🔧 CONTOH IMPLEMENTASI NAMESPACE
+js/store.js
+code
+JavaScript
+window.App = window.App || {};
+(function(ns) {
+    'use strict';
+    
+    ns.store = {
+        // State
+        items: [],
+        filter: 'all',
+        
+        // Constants
+        STORAGE_KEY: 'app_data',
+        MAX_ITEMS: 100,
+        
+        // Getters
+        getFilteredItems: function() {
+            return this.items.filter(/* ... */);
+        },
+        
+        // Setters dengan validasi
+        addItem: function(item) {
+            if (this.items.length >= this.MAX_ITEMS) {
+                throw new Error('Maximum items reached');
+            }
+            this.items.push(item);
+            this.save();
+        },
+        
+        // Persistence
+        save: function() {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.items));
+        },
+        
+        load: function() {
+            var saved = localStorage.getItem(this.STORAGE_KEY);
+            this.items = saved ? JSON.parse(saved) : [];
+        }
+    };
+    
+})(window.App);
+js/app.js
+code
+JavaScript
+window.App = window.App || {};
+(function(ns) {
+    'use strict';
+    
+    ns.init = function() {
+        try {
+            // 1. Load data
+            ns.store.load();
+            
+            // 2. Init modules
+            ns.domain.init();
+            
+            // 3. Bind UI
+            ns.ui.bindAll();
+            
+            // 4. Render initial state
+            ns.domain.render();
+            
+            console.log('✅ App ready');
+        } catch (e) {
+            console.error('❌ Init failed:', e);
+            ns.showError(e.message);
+        }
+    };
+    
+    ns.showError = function(msg) {
+        var el = document.getElementById('app');
+        if (el) {
+            el.innerHTML = '<div class="error"><h2>⚠️ Error</h2><p>' + msg + '</p></div>';
+        }
+    };
+    
+})(window.App);
+
+// Auto-init saat DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+    window.App.init();
+});
+📌 KEY IMPROVEMENTS DARI VERSI SEBELUMNYA
+Aspek	Versi Lama	Versi Baru
+Namespace	Polusi global window.*	Single namespace window.App.*
+Dependencies	CDN boleh	Semua lokal di /lib/
+Offline	Tidak dijamin	Wajib offline-ready
+Struktur	Kaku per jenis	Fleksibel per domain/kompleksitas
+Error Handling	Tidak ada	Wajib try-catch + fallback UI
+Dokumentasi	Hapus README	Generate README baru
+Testing	Manual cek fitur	Checklist terstruktur + offline test
+Edge Cases	Tidak disebutkan	Routing, CSS Modules, TS, env vars
+Aset	Tidak diatur	Struktur /assets/ + /lib/
+fetch() trap	Tidak diakui	Data via <script> tag / JSON inline

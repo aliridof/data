@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Dof Code v3.0</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css">
+
+</head>
+
+<body data-theme="light">
+
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
+<!-- =====================================================
+     HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="header__brand">
+
+        <h1 class="app-title">
+            Dof Code
+        </h1>
+
+    </div>
+
+    <nav
+        class="tabs"
+        aria-label="Primary Navigation">
+
+        <button
+            type="button"
+            class="tab active"
+            data-view="preview">
+
+            Preview
+
+        </button>
+
+        <button
+            type="button"
+            class="tab"
+            data-view="log">
+
+            Log
+
+        </button>
+
+        <button
+            type="button"
+            class="tab"
+            data-view="code">
+
+            Code
+
+        </button>
+
+        <button
+            type="button"
+            class="tab"
+            data-view="url">
+
+            URL
+
+        </button>
+
+    </nav>
+
+    <div class="controls">
+
+        <button
+            id="themeBtn"
+            type="button">
+
+            Theme
+
+        </button>
+
+        <button
+            id="settingsBtn"
+            type="button">
+
+            Settings
+
+        </button>
+
+    </div>
+
+</header>
+
+
+    <!-- =====================================================
+         NOTES PANEL
+    ====================================================== -->
+
+<!-- =====================================================
+     NOTES PANEL
+===================================================== -->
+
+<aside class="left">
+
+    <section class="notes-panel">
+
+        <div class="notes-panel__header">
+
+            <h2>
+                Notes
+            </h2>
+
+        </div>
+
+        <div
+            id="notesList"
+            class="notes-list">
+
+        </div>
+
+        <div class="notes-panel__footer">
+
+            <textarea
+                id="noteInput"
+                placeholder="Write something...">
+            </textarea>
+
+            <div class="notes-actions">
+
+                <button
+                    id="addNoteBtn"
+                    type="button">
+
+                    Add
+
+                </button>
+
+                <button
+                    id="clearNotesBtn"
+                    type="button">
+
+                    Clear
+
+                </button>
+
+                <button
+                    id="exportNotesBtn"
+                    type="button">
+
+                    Export
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</aside>
+
+    <!-- =====================================================
+         LOG VIEW
+    ====================================================== -->
+
+<!-- =====================================================
+     LOG VIEW
+===================================================== -->
+
+<section
+    id="logView"
+    class="view">
+
+    <div class="log-view">
+
+        <div class="log-view__header">
+
+            <h2>
+                Application Log
+            </h2>
+
+            <button
+                id="clearLogBtn"
+                type="button">
+
+                Clear Log
+
+            </button>
+
+        </div>
+
+        <div
+            id="logList"
+            class="log-list">
+
+        </div>
+
+    </div>
+
+</section>
+
+    <!-- =====================================================
+         PREVIEW VIEW
+    ====================================================== -->
+
+
+
+    <!-- =====================================================
+         CODE VIEW
+    ====================================================== -->
+
+
+
+    <!-- =====================================================
+         URL VIEW
+    ====================================================== -->
+
+
+
+    <!-- =====================================================
+         MODALS
+    ====================================================== -->
+
+
+
+    <script src="app.js"></script>
+
+</body>
+
+</html>

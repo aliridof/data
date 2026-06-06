@@ -1,1216 +1,2428 @@
-# DOF·ASTRO — Dokumentasi Teknis Lengkap (Revisi)
+# DOF·ASTRO — Dokumentasi Final & Pseudocode JavaScript
 
 ---
 
 ## DAFTAR ISI
 
 ```
-BAB 1  — Abstraksi & Filosofi Sistem
-BAB 2  — Entitas Sistem (15 Objek)
-BAB 3  — Katalog Aspek (6 + Custom)
-BAB 4  — Sistem ORB Manual
-BAB 5  — Pipeline Kalkulasi Sudut
-BAB 6  — Logika Matriks 15×15
-BAB 7  — Detektor Anomali Kubah
-BAB 8  — Arsitektur Data & Alur Sistem
-BAB 9  — Validasi & Test Cases
+BAB 1  — Konstanta & Konfigurasi Global
+BAB 2  — Entitas & Klasifikasi Zona
+BAB 3  — Katalog Aspek & Sistem ORB
+BAB 4  — Pipeline Kalkulasi Posisi
+BAB 5  — Great-Circle Separation
+BAB 6  — Matching Aspek
+BAB 7  — Matriks 1 — Intra-Dome
+BAB 8  — Matriks 2 — θ Raw
+BAB 9  — Matriks 3 — Cross-Dome
+BAB 10 — Detektor Anomali Kubah
+BAB 11 — Frame Runner (Orkestrasi)
+BAB 12 — Validasi & Test Cases
 ```
 
 ---
 
-## BAB 1: ABSTRAKSI & FILOSOFI SISTEM
-
-### 1.1 Definisi
-
-```
-DOF·ASTRO adalah sistem analisis astronomis kuantitatif
-yang mengukur hubungan geometris antar entitas langit
-menggunakan matematika vektor 3D dan Great-Circle Separation.
-
-PRINSIP UTAMA:
-  • Murni geometri — tidak ada interpretasi subjektif
-  • Berbasis posisi fisik pengamat (Toposentrik)
-  • Sudut diukur di ruang 3D, bukan bidang datar
-  • Tidak ada sistem skor atau bobot nilai
-  • Hanya mendeteksi dan melaporkan aspek yang ada
-```
-
-### 1.2 Apa yang Diukur
-
-```
-Sistem mengukur SUDUT PISAH (θ) antara dua entitas langit.
-
-θ adalah jarak busur terpendek antara dua titik
-di permukaan bola langit, diukur dalam derajat.
-
-Jika θ mendekati sudut aspek tertentu (dalam batas ORB),
-maka pasangan entitas tersebut dinyatakan membentuk aspek.
-
-TIDAK ADA:
-  ✗ Nilai bobot aspek
-  ✗ Skor global atau per-objek
-  ✗ Klasifikasi "baik/buruk"
-  ✗ Interpretasi makna
-
-ADA:
-  ✓ Deteksi aspek (ya/tidak)
-  ✓ Nama aspek yang terbentuk
-  ✓ Nilai θ aktual
-  ✓ Orb (deviasi dari aspek tepat)
-  ✓ Status anomali kubah
-```
-
-### 1.3 Perubahan dari Versi Sebelumnya
-
-```
-┌─────────────────────┬─────────────────────┬─────────────────────┐
-│ Komponen            │ Sebelum             │ Sesudah             │
-├─────────────────────┼─────────────────────┼─────────────────────┤
-│ Jumlah Aspek        │ 16 aspek            │ 6 aspek + custom    │
-│ Sistem Skor         │ Ada (GREEN+4, dll)  │ Dihapus total       │
-│ ORB                 │ Fixed ±1°           │ Manual (default/    │
-│                     │                     │ custom per-aspek)   │
-│ Detektor Anomali    │ Tidak ada           │ Baru: aspek &       │
-│                     │                     │ sudut identik       │
-│ Warna Sel Matrix    │ Per zona skor       │ Per jenis aspek     │
-│                     │ (GREEN/BLUE/dll)    │ (visual saja)       │
-└─────────────────────┴─────────────────────┴─────────────────────┘
-```
-
----
-
-## BAB 2: ENTITAS SISTEM
-
-### 2.1 Taksonomi
-
-```
-ENTITAS DOF·ASTRO (15 Total)
-│
-├── PERSONA (4)
-│   ├── STATIC (2)
-│   │   ├── TZ — Terrestrial Zenith
-│   │   └── TN — Terrestrial Nadir
-│   └── DYNAMIC (2)
-│       ├── CZ — Celestial Zenith
-│       └── CN — Celestial Nadir
-│
-└── OBJECT (11)
-    ├── PLANET (10): SUN MON MER VEN MAR JUP SAT URA NEP PLU
-    └── FIXED STAR (1): SUI (Sirius / α Canis Majoris)
-```
-
-### 2.2 Definisi & Vektor Setiap Entitas
-
-```
-TZ — Terrestrial Zenith
-  Definisi : Titik di permukaan Bumi lokasi pengamat. DIAM.
-  Vektor   : v = [0, 0, +1]  (Alt = +90°)
-  Sub-point: Lokasi pengamat sendiri (φ, λ)
-  isAbove  : Selalu TRUE
-
-TN — Terrestrial Nadir
-  Definisi : Antipoda TZ di permukaan Bumi. DIAM.
-  Vektor   : v = [0, 0, -1]  (Alt = -90°)
-  Sub-point: (-φ, λ ± 180°)
-  isAbove  : Selalu FALSE
-
-CZ — Celestial Zenith
-  Definisi : Titik di bola langit tepat di atas pengamat.
-             BERGERAK mengikuti rotasi Bumi.
-  RA       : = LST pengamat
-  Dec      : = φ (latitude pengamat)
-  Vektor   : v = [0, 0, +1]  (identik TZ dalam ruang lokal)
-  isAbove  : Selalu TRUE
-
-CN — Celestial Nadir
-  Definisi : Antipoda CZ di bola langit. BERGERAK.
-  RA       : = LST + 180°
-  Dec      : = -φ
-  Vektor   : v = [0, 0, -1]  (identik TN dalam ruang lokal)
-  isAbove  : Selalu FALSE
-
-SUN s/d PLU — Planet
-  Sumber   : swe.calc_ut(JD, id, SEFLG_TOPOCTR)
-  Pipeline : Ekliptika → Ekuatorial → Horizontal → Vektor 3D
-  isAbove  : TRUE jika Alt ≥ 0°
-
-SUI — Sirius
-  Sumber   : swe.fixstar2_ut('Sirius', JD, 0)
-  Pipeline : Ekliptika → Ekuatorial → Horizontal → Vektor 3D
-  Fallback : RA=101.287°, Dec=-16.716° (J2000)
-  isAbove  : TRUE jika Alt ≥ 0°
-```
-
-### 2.3 Aturan Zona Entitas
-
-```
-ZENITH ZONE — Entitas yang berlaku:
-
-  isZenithSide(X):
-    X.type ∈ {TZ, CZ} → TRUE  (selalu masuk Zenith Zone)
-    X.type ∈ {TN, CN} → FALSE (dilarang di Zenith Zone)
-    X = Planet/SUI    → X.isAbove (TRUE jika di atas horizon)
-
-NADIR ZONE — Entitas yang berlaku:
-
-  isNadirSide(X):
-    X.type ∈ {TN, CN} → TRUE  (selalu masuk Nadir Zone)
-    X.type ∈ {TZ, CZ} → FALSE (dilarang di Nadir Zone)
-    X = Planet/SUI    → !X.isAbove (TRUE jika di bawah horizon)
-```
-
----
-
-## BAB 3: KATALOG ASPEK
-
-### 3.1 Filosofi Penyederhanaan
-
-```
-Versi sebelumnya menggunakan 16 aspek yang mencakup
-pembagian lingkaran dari /2 hingga /12.
-
-Revisi ini menyederhanakan ke 6 aspek UTAMA yang
-secara geometri paling fundamental dan dapat
-diverifikasi secara langsung dan intuitif.
-
-Aspek-aspek ini dipilih berdasarkan:
-  • Kemurnian geometri (pembagian lingkaran paling dasar)
-  • Universalitas penggunaan dalam tradisi astronomi
-  • Kemudahan verifikasi visual dan temporal
-```
-
-### 3.2 Enam Aspek Utama
-
-```
-═══════════════════════════════════════════════════════════════════
-  #   NAMA          SUDUT    DERIVASI           GEOMETRI
-═══════════════════════════════════════════════════════════════════
-
-1   KONJUNGSI        0°      360° / ∞           Dua titik
-                                                 berhimpit
-                                                 di bola langit
-
-2   SEXTILE          60°     360° / 6           Titik ke-1
-    (Sekstil)                                    dari heksagon
-                                                 beraturan
-
-3   QUINTILE         72°     360° / 5           Titik ke-1
-    (Kuintil)                                    dari pentagon
-                                                 beraturan
-
-4   SQUARE           90°     360° / 4           Titik ke-1
-    (Kuadrat)                                    dari persegi
-                                                 beraturan
-
-5   TRINE            120°    360° / 3           Titik ke-1
-    (Trigon)                                     dari segitiga
-                                                 beraturan
-
-6   OPPOSITION       180°    360° / 2           Dua titik
-    (Oposisi)                                    berlawanan
-                                                 di bola langit
-
-═══════════════════════════════════════════════════════════════════
-```
-
-### 3.3 Jarak Minimum Antar Aspek
-
-```
-Distribusi 6 aspek di rentang 0° — 180°:
-
-  0°        60°   72°      90°          120°                  180°
-  │          │     │        │             │                     │
-  KNJ        SKS   KUI      KDR           TRG                   OPS
-
-Gap antar aspek terdekat:
-
-  KNJ → SKS : 60°   (gap besar, aman)
-  SKS → KUI : 12°   (dengan ORB 3° maks, masih aman: gap > 2×3°)
-  KUI → KDR : 18°   (aman)
-  KDR → TRG : 30°   (aman)
-  TRG → OPS : 60°   (gap besar, aman)
-
-Syarat keamanan: gap > 2 × ORB_maksimum
-  Gap minimum = 12° (antara Sekstil dan Kuintil)
-  ORB maksimum aman = 12° / 2 = 6°
-  
-  Jika pengguna set ORB > 6°, sistem memperingatkan
-  potensi konflik antara Sekstil dan Kuintil.
-```
-
-### 3.4 Aspek Custom — Spesifikasi
-
-```
-MEKANISME CUSTOM ASPECT:
-
-Pengguna dapat menambahkan aspek di luar 6 aspek utama.
-Setiap aspek custom memiliki parameter:
-
-  Parameter yang WAJIB diisi:
-  ┌─────────────────────────────────────────────────────┐
-  │  name  : string  — nama aspek (max 32 karakter)     │
-  │  angle : float   — sudut dalam derajat [0°, 180°]  │
-  │  orb   : float   — toleransi khusus aspek ini      │
-  └─────────────────────────────────────────────────────┘
-
-  Parameter OPSIONAL:
-  ┌─────────────────────────────────────────────────────┐
-  │  symbol : string — simbol unicode (default: ◇)      │
-  │  color  : string — warna hex sel matrix (default:   │
-  │                    #e8e8e8)                         │
-  │  note   : string — catatan/keterangan               │
-  └─────────────────────────────────────────────────────┘
-
-VALIDASI SAAT MENAMBAH ASPEK CUSTOM:
-  1. angle harus float, [0, 180]
-  2. name tidak boleh kosong
-  3. orb harus float positif > 0
-  4. Peringatan jika |angle - aspek_existing| < 2 × orb
-     (potensi konflik matching)
-
-PENYIMPANAN:
-  Aspek custom disimpan terpisah dari 6 aspek utama.
-  Pada saat matching, 6 aspek utama dicek duluan,
-  kemudian aspek custom dicek setelahnya.
-  Jika ada konflik (dua aspek cocok untuk θ yang sama),
-  yang dipilih adalah yang memiliki orb terkecil.
-
-CONTOH ASPEK CUSTOM YANG UMUM DITAMBAHKAN:
-  • Semi-sekstil : 30°
-  • Kuadrat semi : 45°
-  • Septil        : 51.43°
-  • Biseptil      : 102.86°
-  • Triseptil     : 154.29°
-```
-
-### 3.5 Prioritas Matching Aspek
-
-```
-URUTAN PENGECEKAN SAAT MATCHING:
-
-  1. Cek semua 6 aspek utama
-  2. Cek semua aspek custom yang aktif
-  3. Dari semua kandidat yang masuk ORB,
-     pilih yang memiliki orb terkecil
-
-  Pseudocode:
-  
-    best = null
-    best_orb = ORB_aktif   ← nilai inisialisasi = batas maksimal
-
-    for each aspek A in [6_utama + custom_aktif]:
-      deviation = |θ - A.angle|
-      if deviation ≤ A.orb AND deviation < best_orb:
-        best_orb = deviation
-        best = A
-
-    return best  ← null jika tidak ada yang cocok
-```
-
----
-
-## BAB 4: SISTEM ORB MANUAL
-
-### 4.1 Definisi ORB
-
-```
-ORB adalah toleransi maksimal deviasi sudut aktual (θ)
-dari sudut aspek yang tepat (θ_aspek).
-
-Aspek dianggap aktif jika:
-  |θ - θ_aspek| ≤ ORB
-
-ORB dinyatakan dalam derajat.
-
-Hubungan ORB dengan waktu:
-  Kecepatan rotasi Bumi = 15.041° per jam
-  
-  Jendela waktu = ORB / 15.041 jam
-                = ORB × 3.992 menit
-                ≈ ORB × 4 menit
-
-  Contoh:
-    ORB 1° = ±4 menit
-    ORB 3° = ±12 menit
-    ORB 5° = ±20 menit
-```
-
-### 4.2 Mode Default — Single ORB
-
-```
-DESKRIPSI:
-  Satu nilai ORB berlaku untuk SEMUA aspek secara seragam.
-
-PARAMETER:
-  orb_default : float, derajat
-  Default awal : 1.0°
-  Range valid  : 0.1° hingga 10.0°
-  (di atas 10° dianggap terlalu longgar dan diperingatkan)
-
-CARA KERJA:
-  Untuk setiap pasangan (A, B):
-    θ = gcSep(v_A, v_B)
-    
-    Untuk setiap aspek X:
-      if |θ - X.angle| ≤ orb_default:
-        → aspek X aktif
-
-KAPAN DIGUNAKAN:
-  • Analisis umum tanpa preferensi khusus
-  • Perbandingan konsisten antar semua aspek
-  • Mode default saat pertama kali membuka sistem
-```
-
-### 4.3 Mode Custom — ORB Per-Aspek
-
-```
-DESKRIPSI:
-  Setiap aspek memiliki nilai ORB-nya sendiri.
-  ORB aspek custom ditetapkan saat menambahkan aspek.
-  ORB aspek utama dapat diubah secara individual.
-
-PARAMETER:
-  orb_konjungsi  : float (default: 2.0°)
-  orb_sekstil    : float (default: 1.0°)
-  orb_kuintil    : float (default: 1.0°)
-  orb_kuadrat    : float (default: 1.5°)
-  orb_trigon     : float (default: 1.5°)
-  orb_oposisi    : float (default: 2.0°)
-  orb_[custom_N] : float (ditetapkan pengguna)
-
-JUSTIFIKASI DEFAULT:
-  Konjungsi & Oposisi mendapat ORB lebih besar (2°)
-  karena keduanya merupakan aspek dengan dampak
-  geometri paling ekstrem (0° dan 180°).
-
-  Planet bergerak paling lambat saat konjungsi/oposisi
-  (efek retrograde/elongasi maksimum), sehingga jendela
-  waktu aspek secara fisik memang lebih lebar.
-
-CARA KERJA:
-  Untuk setiap pasangan (A, B):
-    θ = gcSep(v_A, v_B)
-    
-    Untuk setiap aspek X dengan orb_X:
-      if |θ - X.angle| ≤ orb_X:
-        → aspek X aktif
-```
-
-### 4.4 Tabel Referensi ORB dan Implikasinya
-
-```
-┌──────────┬───────────────┬────────────────────────────────────┐
-│ ORB (°)  │ Jendela Waktu │ Karakteristik                      │
-├──────────┼───────────────┼────────────────────────────────────┤
-│  0.25°   │  ± 1 menit    │ Sangat presisi, sedikit aspek      │
-│  0.50°   │  ± 2 menit    │ Ketat                              │
-│  1.00°   │  ± 4 menit    │ Standar ketat                      │
-│  2.00°   │  ± 8 menit    │ Standar umum                       │
-│  3.00°   │  ± 12 menit   │ Moderat                            │
-│  5.00°   │  ± 20 menit   │ Longgar                            │
-│  6.00°   │  ± 24 menit   │ BATAS AMAN untuk katalog 6 aspek   │
-│  7.00°+  │  ± 28 menit+  │ ⚠ Potensi konflik SKS↔KUI (gap 12°)│
-└──────────┴───────────────┴────────────────────────────────────┘
-```
-
-### 4.5 Validasi ORB
-
-```
-Sistem melakukan validasi setiap kali ORB diubah:
-
-  PERINGATAN KONFLIK ASPEK:
-    Untuk setiap pasangan aspek (X, Y) dimana X ≠ Y:
-      jika |X.angle - Y.angle| < (X.orb + Y.orb):
-        → Tampilkan peringatan:
-          "ORB Aspek [X] dan [Y] overlap pada θ=[overlap_zone]°.
-           Matching akan menggunakan orb terkecil."
-
-  CONTOH:
-    Sekstil (60°, ORB=5°) dan Kuintil (72°, ORB=5°)
-    Gap = 12°, total ORB = 10°
-    12° > 10° → aman (tidak overlap)
-
-    Sekstil (60°, ORB=7°) dan Kuintil (72°, ORB=7°)
-    Gap = 12°, total ORB = 14°
-    12° < 14° → OVERLAP di rentang 67°–65° → PERINGATKAN
-```
-
----
-
-## BAB 5: PIPELINE KALKULASI SUDUT
-
-### 5.1 Diagram Alur Lengkap
-
-```
-INPUT: Waktu (UTC) + Lokasi (φ, λ, elev)
-│
-├── STEP 1: Hitung JD & LST
-│     JD   = julday(Y, M, D, H_decimal_utc)
-│     GMST = sidtime(JD)                   [jam]
-│     LST  = (GMST × 15 + λ) mod 360      [derajat]
-│
-├── STEP 2: Set toposentrik
-│     swe.set_topo(λ, φ, elev)
-│
-├── STEP 3: Hitung posisi tiap entitas
-│     │
-│     ├── TZ/CZ → v = [0, 0, +1]  (statis/konstan)
-│     ├── TN/CN → v = [0, 0, -1]  (statis/konstan)
-│     │
-│     ├── Planet → calc_ut(JD, id, 32768)
-│     │              → ekliptika (λ, β)
-│     │              → eclToEq(λ, β)   → (RA, Dec)
-│     │              → eqToHz(RA, Dec, LST, φ)  → (Az, Alt)
-│     │              → toVec(Az, Alt)  → [x, y, z]
-│     │
-│     └── Sirius → fixstar2_ut('Sirius', JD, 0)
-│                    → ekliptika (λ, β)
-│                    → eclToEq → eqToHz → toVec
-│
-├── STEP 4: Hitung θ semua pasangan
-│     Untuk (i,j) dimana i ≠ j:
-│       θ_ij = gcSep(v_i, v_j)
-│            = arccos(clamp(v_i · v_j, -1, +1)) × (180/π)
-│
-├── STEP 5: Filter zona
-│     j > i : Zenith Zone → cek isZenithSide(i) & isZenithSide(j)
-│     j < i : Nadir Zone  → cek isNadirSide(i) & isNadirSide(j)
-│
-├── STEP 6: Match aspek
-│     Untuk setiap pasangan aktif:
-│       → matchAspect(θ_ij, mode_orb)
-│       → aspek dengan orb terkecil (jika ada)
-│
-└── STEP 7: Deteksi anomali
-      → hitungAnomalyKubah(zenith_pairs, nadir_pairs)
-```
-
-### 5.2 Konversi Koordinat
-
-```
-A. EKLIPTIKA → EKUATORIAL:
-
-   Input  : λ (longitude ekliptika, °), β (latitude ekliptika, °)
-   Output : RA (radian), Dec (radian)
-
-   ε = 23.439291° = 0.40905 rad  (obliquitas J2000)
-
-   sin(Dec) = sin(β) × cos(ε) + cos(β) × sin(ε) × sin(λ)
-   Dec = arcsin(clamp(sin(Dec), -1, +1))
-
-   RA = atan2(
-     sin(λ) × cos(ε) - tan(β) × sin(ε),
-     cos(λ)
-   )
-   if RA < 0: RA += 2π
-
-
-B. EKUATORIAL → HORIZONTAL:
-
-   Input  : RA (rad), Dec (rad), LST (rad), φ (rad)
-   Output : Az (radian, 0=Utara CW), Alt (radian)
-
-   HA = LST - RA   (Hour Angle)
-
-   sin(Alt) = sin(φ) × sin(Dec) + cos(φ) × cos(Dec) × cos(HA)
-   Alt = arcsin(clamp(sin(Alt), -1, +1))
-
-   Az = atan2(-sin(HA), tan(Dec) × cos(φ) - sin(φ) × cos(HA))
-   if Az < 0: Az += 2π
-
-
-C. HORIZONTAL → VEKTOR 3D:
-
-   Input  : Az (radian), Alt (radian)
-   Output : v = [x, y, z]
-
-   Sumbu: +X = Utara, +Y = Timur, +Z = Zenith
-
-   x = cos(Alt) × cos(Az)
-   y = cos(Alt) × sin(Az)
-   z = sin(Alt)
-
-   Bukti unit: x² + y² + z² = cos²(Alt) + sin²(Alt) = 1 ✓
-```
-
-### 5.3 Great-Circle Separation
-
-```
-FORMULA INTI:
-
-   Input  : v₁ = [x₁, y₁, z₁]  (unit vector entitas A)
-            v₂ = [x₂, y₂, z₂]  (unit vector entitas B)
-   Output : θ dalam derajat
-
-   D     = x₁×x₂ + y₁×y₂ + z₁×z₂   (dot product)
-   D_c   = max(-1, min(+1, D))        (clamp anti-NaN)
-   θ     = arccos(D_c) × (180/π)
-
-   Rentang: θ ∈ [0°, 180°]
-   Simetri: θ(A,B) = θ(B,A)  (dot product komutatif)
-
-
-KASUS KHUSUS PERSONA:
-
-   θ(TZ, X) = arccos([0,0,1] · [x,y,z])
-             = arccos(z)
-             = arccos(sin(Alt_X))
-             = 90° - Alt_X
-
-   θ(TN, X) = arccos([0,0,-1] · [x,y,z])
-             = arccos(-z)
-             = arccos(-sin(Alt_X))
-             = 90° + Alt_X
-```
-
----
-
-## BAB 6: LOGIKA MATRIKS 15×15
-
-### 6.1 Struktur Matriks
-
-```
-MATRIKS 15×15:
-  - 15 sel diagonal  = hitam (self vs self)
-  - 105 sel atas     = Zenith Zone (j > i)
-  - 105 sel bawah    = Nadir Zone  (j < i)
-  Total: 225 sel
-
-ISI SETIAP SEL:
-
-  SEL DIAGONAL:
-    → Hitam
-
-  SEL AKTIF (aspek cocok):
-    → Nama aspek + simbol
-    → Nilai θ aktual
-    → Nilai orb
-
-  SEL AKTIF (tidak ada aspek):
-    → Nilai θ dalam derajat (angka mentah)
-
-  SEL TIDAK AKTIF:
-    → Simbol × (entitas berbeda zona atau di luar horizon)
-```
-
-### 6.2 Decision Tree Aktivasi Sel
-
-```
-Untuk sel (i, j) dimana i ≠ j:
-
-  if j > i:  (Zenith Zone)
-    if NOT isZenSide(E_i): → [×]
-    if NOT isZenSide(E_j): → [×]
-    else:
-      θ = gcSep(v_i, v_j)
-      m = matchAspect(θ)
-      if m: → [nama_aspek | θ | orb]
-      else: → [θ°]
-
-  if j < i:  (Nadir Zone)
-    if NOT isNadSide(E_i): → [×]
-    if NOT isNadSide(E_j): → [×]
-    else:
-      θ = gcSep(v_i, v_j)
-      m = matchAspect(θ)
-      if m: → [nama_aspek | θ | orb]
-      else: → [θ°]
-```
-
-### 6.3 Tabel Aktivasi Lengkap
-
-```
-ZENITH ZONE — isZenSide per tipe entitas:
-
-  TZ  → TRUE  (poros Zenith statis)
-  CZ  → TRUE  (poros Zenith dinamis)
-  TN  → FALSE (dilarang di Zenith Zone)
-  CN  → FALSE (dilarang di Zenith Zone)
-  Planet/SUI di atas horizon (isAbove=T) → TRUE
-  Planet/SUI di bawah horizon (isAbove=F) → FALSE
-
-NADIR ZONE — isNadSide per tipe entitas:
-
-  TN  → TRUE  (poros Nadir statis)
-  CN  → TRUE  (poros Nadir dinamis)
-  TZ  → FALSE (dilarang di Nadir Zone)
-  CZ  → FALSE (dilarang di Nadir Zone)
-  Planet/SUI di bawah horizon (isAbove=F) → TRUE
-  Planet/SUI di atas horizon (isAbove=T)  → FALSE
-```
-
-### 6.4 Matriks 2 — Sudut Mentah
-
-```
-MATRIX 2 (θ Raw):
-  Menampilkan θ aktual untuk SEMUA pasangan,
-  tanpa filter zona, tanpa filter aspek.
-
-  Untuk setiap sel (i, j) dimana i ≠ j:
-    θ = gcSep(v_i, v_j)
-    tampilkan: θ dengan 2 desimal
-
-  Berguna untuk:
-    • Inspeksi sudut antar entitas lintas zona
-    • Menemukan pola yang tidak terlihat di Matrix 1
-    • Verifikasi manual perhitungan
-    • Studi "seberapa jauh dari aspek terdekat"
-
-  Warna sel (opsional):
-    Jika θ dalam ORB aspek tertentu → warna aspek itu
-    Jika tidak → putih/tanpa warna
-```
-
----
-
-## BAB 7: DETEKTOR ANOMALI KUBAH
-
-### 7.1 Konsep Dasar
-
-```
-DEFINISI KUBAH:
-  Zenith Dome = Seluruh langit yang terlihat oleh pengamat
-                (semua entitas dengan isAbove = TRUE,
-                 termasuk TZ dan CZ)
-
-  Nadir Dome  = Seluruh langit di bawah pengamat
-                (semua entitas dengan isAbove = FALSE,
-                 termasuk TN dan CN)
-
-DEFINISI ANOMALI:
-  Kondisi konfigurasi geometris yang melampaui
-  ambang batas yang ditetapkan pengguna.
-
-  Sistem mendeteksi DUA JENIS anomali per kubah.
-```
-
-### 7.2 Anomali Tipe 1 — Kepadatan Aspek
-
-```
-DEFINISI:
-  Jumlah aspek aktif dalam satu kubah melampaui
-  nilai ambang batas N_Aspek.
-
-PARAMETER:
-  N_Aspek_default = 5
-  Dapat diubah pengguna: integer ≥ 1
-
-CARA HITUNG:
-
-  count_zen = 0
-  count_nad = 0
-
-  Untuk setiap pasangan aktif di Zenith Zone:
-    θ = gcSep(v_i, v_j)
-    m = matchAspect(θ)
-    if m ≠ null: count_zen++
-
-  Untuk setiap pasangan aktif di Nadir Zone:
-    θ = gcSep(v_i, v_j)
-    m = matchAspect(θ)
-    if m ≠ null: count_nad++
-
-  if count_zen ≥ N_Aspek:
-    → ANOMALI ASPEK — ZENITH DOME
-    → Detail: "N aspek aktif (ambang: M)"
-
-  if count_nad ≥ N_Aspek:
-    → ANOMALI ASPEK — NADIR DOME
-    → Detail: "N aspek aktif (ambang: M)"
-
-INTERPRETASI:
-  Banyak aspek aktif secara bersamaan
-  mengindikasikan konfigurasi geometris
-  yang padat/kompleks di kubah tersebut.
-  Bukan penilaian baik/buruk — hanya deteksi.
-```
-
-### 7.3 Anomali Tipe 2 — Sudut Identik
-
-```
-DEFINISI:
-  Jumlah pasangan dengan sudut separasi yang IDENTIK
-  (dalam toleransi ±0.1°) dalam satu kubah melampaui
-  nilai ambang batas N_Identik.
-
-PARAMETER:
-  N_Identik_default = 5
-  Toleransi identik  = ±0.1° (fixed, tidak dapat diubah)
-  N_Identik dapat diubah pengguna: integer ≥ 2
-
-CARA HITUNG:
-
-  Kumpulkan semua θ aktif di kubah:
-    θ_list = [θ_ij untuk semua pasangan aktif]
-
-  Buat frequency map:
-    theta_groups = {}
-    for θ in θ_list:
-      key = round(θ / 0.1) × 0.1   ← bulatkan ke 0.1°
-      theta_groups[key] = theta_groups.get(key, []) + [(i,j,θ)]
-
-  Hitung pasangan identik:
-    identical_groups = filter(theta_groups, len ≥ 2)
-    max_identical_count = max(len(group) for group in identical_groups)
-    total_identical_pairs = sum(len(group) for group in identical_groups)
-
-  TRIGGER ANOMALI jika:
-    total_identical_pairs ≥ N_Identik:
-      → ANOMALI SUDUT IDENTIK — DOME
-      → Detail: "N pasangan sudut identik"
-      → Daftar: θ yang berulang dan pasangan entitasnya
-
-INTERPRETASI:
-  Sudut identik mengindikasikan adanya "simpul sudut"
-  (angular node) dimana beberapa benda langit
-  secara bersamaan membentuk hubungan geometris
-  yang sama persis terhadap satu sama lain.
-  Ini adalah kondisi geometris yang langka.
-
-CONTOH ILUSTRASI:
-  Kubah Zenith memiliki 7 entitas aktif.
-  Ternyata:
-    θ(SUN, MON) = 60.05°
-    θ(SUN, MER) = 60.08°
-    θ(VEN, SAT) = 60.03°
-    θ(JUP, SUI) = 60.06°
-    θ(MAR, URA) = 60.09°
-
-  Semua ≈ 60° (dalam ±0.1°) → 5 pasangan identik
-  Jika N_Identik = 5 → ANOMALI TERPICU
-```
-
-### 7.4 Output Laporan Anomali
-
-```
-FORMAT LAPORAN ANOMALI:
-
-  ANOMALI TERDETEKSI
-  ══════════════════════════════════════════
-  Waktu    : [ISO timestamp]
-  Kubah    : ZENITH / NADIR
-  Lokasi   : [lat]°, [lon]°
-
-  Tipe 1 — KEPADATAN ASPEK:
-    Status  : AKTIF / TIDAK AKTIF
-    Jumlah  : N aspek aktif
-    Ambang  : M aspek
-    Daftar  :
-      → [Entitas A] — [aspek] — [Entitas B] (θ=X.XX°, orb=Y.YY°)
-      → ...
-
-  Tipe 2 — SUDUT IDENTIK:
-    Status  : AKTIF / TIDAK AKTIF
-    Jumlah  : N pasangan identik
-    Ambang  : M pasangan
-    Simpul  :
-      → θ ≈ X.X° : [Entitas A]—[Entitas B], [Entitas C]—[Entitas D], ...
-      → ...
-  ══════════════════════════════════════════
-```
-
-### 7.5 Penggabungan Kedua Anomali
-
-```
-KONDISI ANOMALI GANDA:
-
-Kedua anomali dapat aktif secara bersamaan
-dalam kubah yang sama atau berbeda.
-
-SKENARIO                           STATUS
-────────────────────────────────────────────────────────
-Aspek OK, Identik OK               Normal (tidak ada flag)
-Aspek ≥ N, Identik OK              ⚠ Anomali Tipe 1
-Aspek OK, Identik ≥ N              ⚠ Anomali Tipe 2
-Aspek ≥ N, Identik ≥ N             ⚠⚠ Anomali Ganda
-────────────────────────────────────────────────────────
-
-ANOMALI GANDA memiliki flag tersendiri dan
-ditampilkan dengan visual yang lebih menonjol
-di antarmuka pengguna.
-```
-
----
-
-## BAB 8: ARSITEKTUR DATA & ALUR SISTEM
-
-### 8.1 Struktur Data Aspek
-
-```
-ASPEK UTAMA (immutable, tidak dapat dihapus):
-
-  AspekUtama = [
-    {
-      id     : 'konj',
-      name   : 'Konjungsi',
-      angle  : 0,
-      symbol : '☌',
-      custom : false
-    },
-    {
-      id     : 'seks',
-      name   : 'Sekstil',
-      angle  : 60,
-      symbol : '⚹',
-      custom : false
-    },
-    {
-      id     : 'kuin',
-      name   : 'Kuintil',
-      angle  : 72,
-      symbol : '⬠',
-      custom : false
-    },
-    {
-      id     : 'kuad',
-      name   : 'Kuadrat',
-      angle  : 90,
-      symbol : '□',
-      custom : false
-    },
-    {
-      id     : 'trig',
-      name   : 'Trigon',
-      angle  : 120,
-      symbol : '△',
-      custom : false
-    },
-    {
-      id     : 'opos',
-      name   : 'Oposisi',
-      angle  : 180,
-      symbol : '☍',
-      custom : false
-    }
-  ]
-
-
-ASPEK CUSTOM (mutable, dapat ditambah/hapus):
-
-  AspekCustom = [
-    {
-      id     : 'cust_0001',    ← auto-generated UUID
-      name   : string,
-      angle  : float,
-      symbol : string,
-      orb    : float,          ← orb khusus aspek ini
-      color  : string,         ← warna sel matrix
-      note   : string,
-      custom : true,
-      active : boolean         ← bisa dinonaktifkan sementara
-    },
-    ...
-  ]
-```
-
-### 8.2 Struktur Data Konfigurasi ORB
-
-```
-KONFIGURASI ORB:
-
-  OrbConfig = {
-    mode : 'default' | 'custom',
-
-    default_value : float,   ← digunakan jika mode = 'default'
-
-    custom_values : {         ← digunakan jika mode = 'custom'
-      'konj' : float,
-      'seks' : float,
-      'kuin' : float,
-      'kuad' : float,
-      'trig' : float,
-      'opos' : float,
-      'cust_0001' : float,   ← untuk setiap aspek custom
-      ...
-    }
-  }
-
-
-FUNGSI AMBIL ORB:
-
-  getOrb(aspek_id, config):
-    if config.mode === 'default':
-      return config.default_value
-    else:
-      return config.custom_values[aspek_id] ?? config.default_value
-```
-
-### 8.3 Struktur Data Konfigurasi Anomali
-
-```
-KONFIGURASI ANOMALI:
-
-  AnomalyConfig = {
-    enabled : boolean,        ← aktifkan/nonaktifkan deteksi
-
+## BAB 1: KONSTANTA & KONFIGURASI GLOBAL
+
+```js
+// ============================================================
+// BAB 1 — KONSTANTA & KONFIGURASI GLOBAL
+// ============================================================
+
+// ------------------------------------------------------------
+// 1.1 KONSTANTA ASTRONOMI
+// ------------------------------------------------------------
+
+const ASTRO_CONST = {
+  DEG_TO_RAD      : Math.PI / 180,
+  RAD_TO_DEG      : 180 / Math.PI,
+  OBLIQUITY_DEG   : 23.439291,                       // ε J2000
+  OBLIQUITY_RAD   : 23.439291 * (Math.PI / 180),
+  EARTH_ROT_DEG_H : 15.041,                          // °/jam rotasi Bumi
+  MIN_PER_DEG     : 3.992,                           // menit per derajat ORB
+};
+
+// ------------------------------------------------------------
+// 1.2 ID ENTITAS
+// ------------------------------------------------------------
+
+const ENTITY_KEYS = [
+  'TZ',  // 0  — Terrestrial Zenith
+  'TN',  // 1  — Terrestrial Nadir
+  'CZ',  // 2  — Celestial Zenith
+  'CN',  // 3  — Celestial Nadir
+  'SUN', // 4
+  'MON', // 5
+  'MER', // 6
+  'VEN', // 7
+  'MAR', // 8
+  'JUP', // 9
+  'SAT', // 10
+  'URA', // 11
+  'NEP', // 12
+  'PLU', // 13
+  'SUI', // 14 — Sirius
+];
+
+const ENTITY_COUNT = 15;
+
+// Swiss Ephemeris planet IDs
+const SWE_IDS = {
+  SUN : 0,
+  MON : 1,
+  MER : 2,
+  VEN : 3,
+  MAR : 4,
+  JUP : 5,
+  SAT : 6,
+  URA : 7,
+  NEP : 8,
+  PLU : 9,
+};
+
+// Tipe entitas
+const ENTITY_TYPE = {
+  PERSONA_STATIC  : 'persona_static',
+  PERSONA_DYNAMIC : 'persona_dynamic',
+  PLANET          : 'planet',
+  FIXED_STAR      : 'fixed_star',
+};
+
+// ------------------------------------------------------------
+// 1.3 KONFIGURASI HORIZON
+// ------------------------------------------------------------
+
+/**
+ * HorizonConfig
+ * @typedef {Object} HorizonConfig
+ * @property {number}  threshold         - Alt minimum untuk isAbove (default 3.0°)
+ * @property {string}  unit              - selalu 'deg'
+ * @property {boolean} show_transitional - tampilkan flag entitas di zona transisi
+ */
+const DEFAULT_HORIZON_CONFIG = {
+  threshold         : 3.0,
+  unit              : 'deg',
+  show_transitional : true,
+};
+
+// Zona transisi: |Alt - threshold| < TRANSITIONAL_BAND
+const TRANSITIONAL_BAND = 0.5; // derajat
+
+// ------------------------------------------------------------
+// 1.4 KONFIGURASI ORB
+// ------------------------------------------------------------
+
+/**
+ * OrbConfig
+ * @typedef {Object} OrbConfig
+ * @property {'default'|'custom'} mode
+ * @property {number} default_value
+ * @property {Object} custom_values      - key: aspek_id, value: float
+ */
+const DEFAULT_ORB_CONFIG = {
+  mode          : 'default',
+  default_value : 1.0,
+  custom_values : {
+    konj : 2.0,
+    seks : 1.0,
+    kuin : 1.0,
+    kuad : 1.5,
+    trig : 1.5,
+    opos : 2.0,
+  },
+};
+
+// ------------------------------------------------------------
+// 1.5 KONFIGURASI ANOMALI
+// ------------------------------------------------------------
+
+/**
+ * AnomalyConfig
+ * @typedef {Object} AnomalyConfig
+ */
+const DEFAULT_ANOMALY_CONFIG = {
+  enabled : true,
+
+  n_aspek : {
+    enabled   : true,
+    threshold : 5,
+  },
+
+  n_identik : {
+    enabled   : true,
+    threshold : 5,
+    tolerance : 0.1,   // fixed, tidak dapat diubah
+  },
+
+  crossdome : {
+    enabled   : false,
     n_aspek : {
-      enabled   : boolean,
-      threshold : integer,    ← default: 5
+      enabled   : true,
+      threshold : 3,
     },
-
     n_identik : {
-      enabled   : boolean,
-      threshold : integer,    ← default: 5
-      tolerance : 0.1,        ← fixed, tidak dapat diubah
+      enabled   : true,
+      threshold : 3,
+      tolerance : 0.1,
+    },
+  },
+};
+
+// ------------------------------------------------------------
+// 1.6 KONFIGURASI CROSS-DOME
+// ------------------------------------------------------------
+
+/**
+ * CrossDomeConfig
+ * @typedef {Object} CrossDomeConfig
+ */
+const DEFAULT_CROSSDOME_CONFIG = {
+  enabled               : true,
+  match_aspects         : true,
+  use_same_orb          : true,
+  cross_orb_scale       : 1.0,
+  show_transitional_row : false,
+};
+```
+
+---
+
+## BAB 2: ENTITAS & KLASIFIKASI ZONA
+
+```js
+// ============================================================
+// BAB 2 — ENTITAS & KLASIFIKASI ZONA
+// ============================================================
+
+// ------------------------------------------------------------
+// 2.1 SKEMA ENTITAS (OUTPUT KALKULASI)
+// ------------------------------------------------------------
+
+/**
+ * Entity Object (hasil kalkulasi posisi)
+ * @typedef {Object} Entity
+ * @property {string}   key          - 'TZ'|'TN'|'CZ'|...|'SUI'
+ * @property {string}   type         - ENTITY_TYPE.*
+ * @property {number[]} vec          - [x, y, z] unit vector
+ * @property {number}   az           - azimuth derajat
+ * @property {number}   alt          - altitude derajat
+ * @property {boolean}  isAbove      - Alt >= H_threshold
+ * @property {boolean}  transitional - |Alt - H_threshold| < BAND
+ * @property {number}   subLat       - sub-point latitude
+ * @property {number}   subLon       - sub-point longitude
+ */
+
+// ------------------------------------------------------------
+// 2.2 FACTORY ENTITAS STATIS (PERSONA)
+// ------------------------------------------------------------
+
+/**
+ * Membuat entitas Persona yang vektornya selalu statis.
+ * TZ dan CZ memiliki vektor [0,0,+1].
+ * TN dan CN memiliki vektor [0,0,-1].
+ *
+ * @param {string} key       - 'TZ'|'TN'|'CZ'|'CN'
+ * @param {number} lat       - latitude pengamat (°)
+ * @param {number} lon       - longitude pengamat (°)
+ * @returns {Entity}
+ */
+function makePersonaEntity(key, lat, lon) {
+  const isZenith = (key === 'TZ' || key === 'CZ');
+
+  const vec = isZenith ? [0, 0, 1] : [0, 0, -1];
+  const alt = isZenith ? 90 : -90;
+
+  let subLat, subLon;
+  if (key === 'TZ') {
+    subLat = lat;
+    subLon = lon;
+  } else if (key === 'TN') {
+    subLat = -lat;
+    subLon = lon >= 0 ? lon - 180 : lon + 180;
+  } else {
+    // CZ dan CN: sub-point dari RA/Dec (tidak relevan untuk vektor)
+    subLat = null;
+    subLon = null;
+  }
+
+  return {
+    key,
+    type         : key === 'TZ' || key === 'TN'
+                     ? ENTITY_TYPE.PERSONA_STATIC
+                     : ENTITY_TYPE.PERSONA_DYNAMIC,
+    vec,
+    az           : isZenith ? 0 : 180,
+    alt,
+    isAbove      : isZenith,
+    transitional : false,   // persona tidak pernah transitional
+    subLat,
+    subLon,
+  };
+}
+
+// ------------------------------------------------------------
+// 2.3 KLASIFIKASI ZONA
+// ------------------------------------------------------------
+
+/**
+ * Apakah entitas masuk Zenith Side (Kubah Atas)?
+ *
+ * Persona TZ/CZ → selalu TRUE
+ * Persona TN/CN → selalu FALSE
+ * Planet/Bintang → TRUE jika isAbove
+ *
+ * @param {Entity} entity
+ * @returns {boolean}
+ */
+function isZenithSide(entity) {
+  if (entity.key === 'TZ' || entity.key === 'CZ') return true;
+  if (entity.key === 'TN' || entity.key === 'CN') return false;
+  return entity.isAbove;
+}
+
+/**
+ * Apakah entitas masuk Nadir Side (Kubah Bawah)?
+ *
+ * Persona TN/CN → selalu TRUE
+ * Persona TZ/CZ → selalu FALSE
+ * Planet/Bintang → TRUE jika !isAbove
+ *
+ * @param {Entity} entity
+ * @returns {boolean}
+ */
+function isNadirSide(entity) {
+  if (entity.key === 'TN' || entity.key === 'CN') return true;
+  if (entity.key === 'TZ' || entity.key === 'CZ') return false;
+  return !entity.isAbove;
+}
+
+/**
+ * Apakah pasangan (A, B) adalah pasangan Cross-Dome?
+ * Cross-Dome: satu di Zenith, satu di Nadir.
+ *
+ * @param {Entity} entityA
+ * @param {Entity} entityB
+ * @returns {boolean}
+ */
+function isCrossDomePair(entityA, entityB) {
+  return (
+    (isZenithSide(entityA) && isNadirSide(entityB)) ||
+    (isNadirSide(entityA)  && isZenithSide(entityB))
+  );
+}
+
+// ------------------------------------------------------------
+// 2.4 EVALUASI isAbove DENGAN H_threshold
+// ------------------------------------------------------------
+
+/**
+ * Menentukan status isAbove dan transitional
+ * untuk entitas Planet atau Bintang Tetap.
+ *
+ * @param {number} alt              - altitude aktual (°)
+ * @param {HorizonConfig} hConfig
+ * @returns {{ isAbove: boolean, transitional: boolean }}
+ */
+function evalHorizon(alt, hConfig) {
+  const { threshold } = hConfig;
+  const isAbove       = alt >= threshold;
+  const transitional  = Math.abs(alt - threshold) < TRANSITIONAL_BAND;
+
+  return { isAbove, transitional };
+}
+```
+
+---
+
+## BAB 3: KATALOG ASPEK & SISTEM ORB
+
+```js
+// ============================================================
+// BAB 3 — KATALOG ASPEK & SISTEM ORB
+// ============================================================
+
+// ------------------------------------------------------------
+// 3.1 ASPEK UTAMA (IMMUTABLE)
+// ------------------------------------------------------------
+
+/**
+ * AspectDef
+ * @typedef {Object} AspectDef
+ * @property {string}  id
+ * @property {string}  name
+ * @property {number}  angle   - sudut tepat (°)
+ * @property {string}  symbol
+ * @property {string}  color   - warna hex default sel matrix
+ * @property {boolean} custom  - false untuk aspek utama
+ */
+
+/** @type {AspectDef[]} */
+const ASPECTS_CORE = [
+  { id:'konj', name:'Konjungsi', angle:0,   symbol:'☌', color:'#c8e6c9', custom:false },
+  { id:'seks', name:'Sekstil',   angle:60,  symbol:'⚹', color:'#bbdefb', custom:false },
+  { id:'kuin', name:'Kuintil',   angle:72,  symbol:'⬠', color:'#e1bee7', custom:false },
+  { id:'kuad', name:'Kuadrat',   angle:90,  symbol:'□', color:'#ffcdd2', custom:false },
+  { id:'trig', name:'Trigon',    angle:120, symbol:'△', color:'#fff9c4', custom:false },
+  { id:'opos', name:'Oposisi',   angle:180, symbol:'☍', color:'#ffe0b2', custom:false },
+];
+
+// ------------------------------------------------------------
+// 3.2 STORE ASPEK CUSTOM (MUTABLE)
+// ------------------------------------------------------------
+
+/** @type {AspectDef[]} */
+let customAspects = [];
+
+let customAspectCounter = 0;
+
+/**
+ * Menghasilkan ID unik untuk aspek custom.
+ * @returns {string}
+ */
+function generateCustomId() {
+  customAspectCounter++;
+  return `cust_${String(customAspectCounter).padStart(4, '0')}`;
+}
+
+/**
+ * Menambahkan aspek custom baru.
+ * Memvalidasi parameter dan memeringatkan jika ada potensi konflik.
+ *
+ * @param {Object} params
+ * @param {string} params.name
+ * @param {number} params.angle   - [0, 180]
+ * @param {number} params.orb     - > 0
+ * @param {string} [params.symbol='◇']
+ * @param {string} [params.color='#e8e8e8']
+ * @param {string} [params.note='']
+ * @param {OrbConfig} orbConfig   - konfigurasi ORB saat ini
+ * @returns {{ ok: boolean, id?: string, warnings: string[], errors: string[] }}
+ */
+function addCustomAspect(params, orbConfig) {
+  const errors   = [];
+  const warnings = [];
+
+  // Validasi wajib
+  if (!params.name || params.name.trim() === '') {
+    errors.push('name tidak boleh kosong.');
+  }
+  if (typeof params.angle !== 'number' || params.angle < 0 || params.angle > 180) {
+    errors.push('angle harus angka antara 0 dan 180.');
+  }
+  if (typeof params.orb !== 'number' || params.orb <= 0) {
+    errors.push('orb harus angka positif > 0.');
+  }
+
+  if (errors.length > 0) return { ok: false, errors, warnings };
+
+  // Peringatan konflik dengan aspek yang sudah ada
+  const allExisting = getAllAspects();
+  for (const existing of allExisting) {
+    const existingOrb = getOrb(existing.id, orbConfig);
+    const gap         = Math.abs(params.angle - existing.angle);
+    if (gap < (params.orb + existingOrb)) {
+      warnings.push(
+        `Potensi konflik dengan ${existing.name} (${existing.angle}°). ` +
+        `Gap ${gap.toFixed(1)}° < total ORB ${(params.orb + existingOrb).toFixed(1)}°.`
+      );
     }
   }
-```
 
-### 8.4 Struktur Data Output Per Frame
+  const newAspect = {
+    id     : generateCustomId(),
+    name   : params.name.trim(),
+    angle  : params.angle,
+    symbol : params.symbol  || '◇',
+    color  : params.color   || '#e8e8e8',
+    note   : params.note    || '',
+    orb    : params.orb,
+    custom : true,
+    active : true,
+  };
 
-```
-OUTPUT KALKULASI PER FRAME:
+  customAspects.push(newAspect);
 
-  FrameResult = {
-    timestamp : ISO8601,
-    jd        : float,
-    gmst      : float,
-    lst_deg   : float,
+  return { ok: true, id: newAspect.id, errors: [], warnings };
+}
 
-    entities : [
-      {
-        key     : string,
-        type    : string,
-        vec     : [x, y, z],
-        az      : float,
-        alt     : float,
-        isAbove : boolean,
-        subLat  : float,
-        subLon  : float,
-      },
-      ...  ← 15 entitas
-    ],
+/**
+ * Menghapus aspek custom berdasarkan ID.
+ * @param {string} id
+ * @returns {boolean}
+ */
+function removeCustomAspect(id) {
+  const before = customAspects.length;
+  customAspects = customAspects.filter(a => a.id !== id);
+  return customAspects.length < before;
+}
 
-    pairs : [
-      {
-        i       : integer,   ← index entitas A
-        j       : integer,   ← index entitas B
-        zone    : 'zenith' | 'nadir',
-        theta   : float,     ← sudut dalam derajat
-        active  : boolean,   ← apakah masuk zona
-        aspect  : {          ← null jika tidak ada aspek
-          id    : string,
-          name  : string,
-          angle : float,
-          orb   : float,     ← orb yang digunakan
-          deviation : float  ← |theta - angle|
-        } | null
-      },
-      ...  ← 210 pasangan
-    ],
+/**
+ * Mengaktifkan atau menonaktifkan aspek custom.
+ * @param {string}  id
+ * @param {boolean} active
+ */
+function setCustomAspectActive(id, active) {
+  const aspect = customAspects.find(a => a.id === id);
+  if (aspect) aspect.active = active;
+}
 
-    anomaly : {
-      zenith : {
-        aspek_count    : integer,
-        aspek_flag     : boolean,
-        identik_count  : integer,
-        identik_flag   : boolean,
-        identik_groups : [...],
-      },
-      nadir : {
-        aspek_count    : integer,
-        aspek_flag     : boolean,
-        identik_count  : integer,
-        identik_flag   : boolean,
-        identik_groups : [...],
+/**
+ * Mengembalikan semua aspek: 6 utama + custom yang aktif.
+ * @returns {AspectDef[]}
+ */
+function getAllAspects() {
+  const activeCustom = customAspects.filter(a => a.active);
+  return [...ASPECTS_CORE, ...activeCustom];
+}
+
+// ------------------------------------------------------------
+// 3.3 SISTEM ORB
+// ------------------------------------------------------------
+
+/**
+ * Mengambil nilai ORB untuk aspek tertentu.
+ *
+ * Mode 'default' : semua aspek mendapat orb_default.
+ * Mode 'custom'  : setiap aspek punya ORB sendiri,
+ *                  fallback ke default_value jika tidak ada.
+ *
+ * @param {string}    aspectId
+ * @param {OrbConfig} config
+ * @returns {number}
+ */
+function getOrb(aspectId, config) {
+  if (config.mode === 'default') {
+    return config.default_value;
+  }
+  // mode 'custom'
+  const val = config.custom_values[aspectId];
+  return (val !== undefined && val !== null) ? val : config.default_value;
+}
+
+/**
+ * Mengubah ORB default (mode 'default').
+ * Memvalidasi range dan memperingatkan jika terlalu besar.
+ *
+ * @param {number}    value
+ * @param {OrbConfig} config     - dimodifikasi in-place
+ * @returns {{ ok: boolean, warnings: string[] }}
+ */
+function setDefaultOrb(value, config) {
+  const warnings = [];
+
+  if (typeof value !== 'number' || value < 0.1) {
+    return { ok: false, warnings: ['ORB minimum adalah 0.1°.'] };
+  }
+  if (value > 10.0) {
+    warnings.push('ORB > 10° dianggap terlalu longgar.');
+  }
+  if (value > 6.0) {
+    warnings.push(
+      'ORB > 6° dapat menyebabkan konflik antara Sekstil (60°) ' +
+      'dan Kuintil (72°) — gap hanya 12°.'
+    );
+  }
+
+  config.default_value = value;
+  return { ok: true, warnings };
+}
+
+/**
+ * Validasi seluruh konfigurasi ORB untuk mendeteksi konflik antar aspek.
+ * Mengembalikan daftar pasangan aspek yang ORB-nya overlap.
+ *
+ * @param {OrbConfig} config
+ * @returns {Array<{ aspectA: string, aspectB: string, gap: number, totalOrb: number }>}
+ */
+function validateOrbConflicts(config) {
+  const allAspects = getAllAspects();
+  const conflicts  = [];
+
+  for (let i = 0; i < allAspects.length; i++) {
+    for (let j = i + 1; j < allAspects.length; j++) {
+      const A      = allAspects[i];
+      const B      = allAspects[j];
+      const orbA   = getOrb(A.id, config);
+      const orbB   = getOrb(B.id, config);
+      const gap    = Math.abs(A.angle - B.angle);
+      const total  = orbA + orbB;
+
+      if (gap < total) {
+        conflicts.push({
+          aspectA  : A.name,
+          aspectB  : B.name,
+          gap      : gap,
+          totalOrb : total,
+        });
       }
     }
   }
-```
 
-### 8.5 Alur Data Per Frame
-
-```
-FRAME N
-│
-├─ Baca konfigurasi saat ini
-│    OrbConfig, AnomalyConfig, AspekCustom
-│
-├─ Hitung posisi → FrameResult.entities[15]
-│
-├─ Hitung 210 pasangan → FrameResult.pairs[210]
-│    Setiap pasangan:
-│      1. Tentukan zona (zenith/nadir)
-│      2. Cek aktivasi zona
-│      3. Hitung θ (gcSep)
-│      4. Match aspek (matchAspect + getOrb)
-│      5. Simpan hasil
-│
-├─ Hitung anomali → FrameResult.anomaly
-│    Zenith:
-│      → filter pairs dengan zone='zenith' & active=true
-│      → hitung aspek_count (pairs dengan aspect≠null)
-│      → bandingkan dengan threshold
-│      → hitung identik_count (θ dalam ±0.1°)
-│      → bandingkan dengan threshold
-│    Nadir:
-│      → proses yang sama
-│
-└─ Render ke UI
-     → Matrix 1 (aspek)
-     → Matrix 2 (θ raw)
-     → Entity grid
-     → Map markers
-     → Telemetry
-     → Anomaly panel
+  return conflicts;
+}
 ```
 
 ---
 
-## BAB 9: VALIDASI & TEST CASES
+## BAB 4: PIPELINE KALKULASI POSISI
 
-### 9.1 Test Cases Deterministik
+```js
+// ============================================================
+// BAB 4 — PIPELINE KALKULASI POSISI
+// ============================================================
 
-```
-TEST 1: Konjungsi TZ-Planet (Alt = +90°)
+// ------------------------------------------------------------
+// 4.1 KONVERSI WAKTU
+// ------------------------------------------------------------
 
-  Setup: Planet X tepat di Zenith, Alt = 90°
-  v_TZ = [0, 0, 1]
-  v_X  = [cos90°·cos(Az), cos90°·sin(Az), sin90°] = [0, 0, 1]
-  
-  D = 0·0 + 0·0 + 1·1 = 1.0
-  θ = arccos(1.0) = 0° → Konjungsi ✓
+/**
+ * Menghitung Julian Day dari komponen waktu UTC.
+ * Menggunakan Swiss Ephemeris.
+ *
+ * @param {number} year
+ * @param {number} month   - 1–12
+ * @param {number} day     - 1–31
+ * @param {number} hour    - desimal UTC (misal 14.5 = 14:30)
+ * @returns {number} JD
+ */
+function calcJD(year, month, day, hour) {
+  return swe.julday(year, month, day, hour, swe.GREG_CAL);
+}
 
+/**
+ * Menghitung Greenwich Mean Sidereal Time (GMST) dalam derajat.
+ *
+ * @param {number} jd
+ * @returns {number} GMST derajat [0, 360)
+ */
+function calcGMST(jd) {
+  const gmstHours = swe.sidtime(jd);   // jam [0, 24)
+  return (gmstHours * 15) % 360;
+}
 
-TEST 2: Kuadrat TZ-Planet (Alt = 0°, di Horizon)
+/**
+ * Menghitung Local Sidereal Time (LST) dalam derajat.
+ *
+ * @param {number} gmstDeg  - GMST dalam derajat
+ * @param {number} lonDeg   - longitude pengamat (° Timur positif)
+ * @returns {number} LST derajat [0, 360)
+ */
+function calcLST(gmstDeg, lonDeg) {
+  return ((gmstDeg + lonDeg) % 360 + 360) % 360;
+}
 
-  v_TZ = [0, 0, 1]
-  v_X  = [cos0°·cos90°, cos0°·sin90°, sin0°] = [0, 1, 0]
-         (Az=90° sebagai contoh)
-  
-  D = 0·0 + 0·1 + 1·0 = 0
-  θ = arccos(0) = 90° → Kuadrat ✓
+// ------------------------------------------------------------
+// 4.2 KONVERSI KOORDINAT
+// ------------------------------------------------------------
 
+/**
+ * Ekliptika → Ekuatorial.
+ *
+ * @param {number} lonEclDeg   - longitude ekliptika (°)
+ * @param {number} latEclDeg   - latitude ekliptika (°)
+ * @returns {{ raDeg: number, decDeg: number }}
+ */
+function eclToEq(lonEclDeg, latEclDeg) {
+  const D = ASTRO_CONST.DEG_TO_RAD;
+  const R = ASTRO_CONST.RAD_TO_DEG;
+  const e = ASTRO_CONST.OBLIQUITY_RAD;
 
-TEST 3: Trigon TZ-Planet (Alt = -30°)
+  const lon = lonEclDeg * D;
+  const lat = latEclDeg * D;
 
-  a = -30° = -0.5236 rad
-  v_TZ = [0, 0, 1]
-  
-  D = sin(-30°) = -0.5
-  θ = arccos(-0.5) = 120° → Trigon ✓
+  const sinDec = Math.sin(lat) * Math.cos(e)
+               + Math.cos(lat) * Math.sin(e) * Math.sin(lon);
 
+  const decRad = Math.asin(Math.max(-1, Math.min(1, sinDec)));
 
-TEST 4: Oposisi TZ-TN (selalu)
+  let raRad = Math.atan2(
+    Math.sin(lon) * Math.cos(e) - Math.tan(lat) * Math.sin(e),
+    Math.cos(lon)
+  );
+  if (raRad < 0) raRad += 2 * Math.PI;
 
-  v_TZ = [0, 0, +1]
-  v_TN = [0, 0, -1]
-  
-  D = 0·0 + 0·0 + (+1)·(-1) = -1
-  θ = arccos(-1) = 180° → Oposisi ✓
+  return {
+    raDeg  : raRad  * R,
+    decDeg : decRad * R,
+  };
+}
 
+/**
+ * Ekuatorial → Horizontal.
+ *
+ * @param {number} raDeg    - Right Ascension (°)
+ * @param {number} decDeg   - Declination (°)
+ * @param {number} lstDeg   - Local Sidereal Time (°)
+ * @param {number} latDeg   - latitude pengamat (°)
+ * @returns {{ azDeg: number, altDeg: number }}
+ */
+function eqToHz(raDeg, decDeg, lstDeg, latDeg) {
+  const D = ASTRO_CONST.DEG_TO_RAD;
+  const R = ASTRO_CONST.RAD_TO_DEG;
 
-TEST 5: Konjungsi TZ-CZ (selalu)
+  const ha  = ((lstDeg - raDeg) % 360 + 360) % 360;   // Hour Angle (°)
+  const haR = ha  * D;
+  const decR = decDeg * D;
+  const latR = latDeg * D;
 
-  v_TZ = [0, 0, +1]
-  v_CZ = [0, 0, +1]
-  
-  D = 1
-  θ = 0° → Konjungsi ✓
+  const sinAlt = Math.sin(latR) * Math.sin(decR)
+               + Math.cos(latR) * Math.cos(decR) * Math.cos(haR);
 
+  const altRad = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
 
-TEST 6: Sekstil TZ-Planet (Alt = +30°)
+  let azRad = Math.atan2(
+    -Math.sin(haR),
+    Math.tan(decR) * Math.cos(latR) - Math.sin(latR) * Math.cos(haR)
+  );
+  if (azRad < 0) azRad += 2 * Math.PI;
 
-  θ = 90° - 30° = 60° → Sekstil ✓
-  Verifikasi:
-    v_TZ = [0,0,1], v_X = [cos30°·cos(Az), cos30°·sin(Az), sin30°]
-    D = sin(30°) = 0.5
-    θ = arccos(0.5) = 60° ✓
+  return {
+    azDeg  : azRad  * R,
+    altDeg : altRad * R,
+  };
+}
 
+/**
+ * Horizontal → Vektor 3D (unit vector).
+ * Sistem sumbu: +X=Utara, +Y=Timur, +Z=Zenith
+ *
+ * @param {number} azDeg   - Azimuth (°), 0=Utara, CW
+ * @param {number} altDeg  - Altitude (°)
+ * @returns {number[]} [x, y, z]
+ */
+function hzToVec(azDeg, altDeg) {
+  const D   = ASTRO_CONST.DEG_TO_RAD;
+  const az  = azDeg  * D;
+  const alt = altDeg * D;
 
-TEST 7: Anomali Aspek — Zenith (N=3)
+  return [
+    Math.cos(alt) * Math.cos(az),   // x = Utara
+    Math.cos(alt) * Math.sin(az),   // y = Timur
+    Math.sin(alt),                   // z = Zenith
+  ];
+}
 
-  Setup: 3 aspek aktif di Zenith Zone, N_Aspek=3
-  count_zen = 3 ≥ N_Aspek = 3 → ANOMALI AKTIF ✓
+// ------------------------------------------------------------
+// 4.3 KALKULASI POSISI PLANET
+// ------------------------------------------------------------
 
+/**
+ * Menghitung posisi Planet menggunakan Swiss Ephemeris (WASM).
+ * Flag SEFLG_TOPOCTR (32768) menghasilkan posisi toposentrik.
+ *
+ * @param {number}        jd
+ * @param {string}        key        - 'SUN'|'MON'|...|'PLU'
+ * @param {number}        lstDeg
+ * @param {number}        latDeg
+ * @param {HorizonConfig} hConfig
+ * @returns {Entity}
+ */
+function calcPlanetEntity(jd, key, lstDeg, latDeg, hConfig) {
+  const sweId  = SWE_IDS[key];
+  const TOPOCTR = 32768;
 
-TEST 8: Anomali Identik — Nadir (N=2)
+  const result = swe.calc_ut(jd, sweId, TOPOCTR);
+  // result = { lon, lat, dist, ... }  (koordinat ekliptika)
 
-  Setup:
-    θ(A,B) = 60.05°
-    θ(C,D) = 60.08°
-    θ(E,F) = 60.03°
+  const { raDeg, decDeg } = eclToEq(result.lon, result.lat);
+  const { azDeg, altDeg } = eqToHz(raDeg, decDeg, lstDeg, latDeg);
+  const vec                = hzToVec(azDeg, altDeg);
 
-  Setelah bucketing (±0.1°):
-    group[60.0°] = [(A,B), (C,D), (E,F)] → 3 pasangan
+  const { isAbove, transitional } = evalHorizon(altDeg, hConfig);
 
-  N_Identik = 2, total_identical = 3 ≥ 2 → ANOMALI AKTIF ✓
+  return {
+    key,
+    type         : ENTITY_TYPE.PLANET,
+    vec,
+    az           : azDeg,
+    alt          : altDeg,
+    isAbove,
+    transitional,
+    subLat       : decDeg,     // sub-point ≈ Dec untuk planet
+    subLon       : raDeg,
+  };
+}
 
+// ------------------------------------------------------------
+// 4.4 KALKULASI POSISI SIRIUS
+// ------------------------------------------------------------
 
-TEST 9: ORB Custom — Konflik Terdeteksi
+// Koordinat fallback Sirius (J2000)
+const SIRIUS_FALLBACK = { raDeg: 101.287, decDeg: -16.716 };
 
-  Setup: Sekstil ORB=7°, Kuintil ORB=7°
-  Gap = |72° - 60°| = 12°
-  Total ORB = 7° + 7° = 14°
-  12° < 14° → KONFLIK TERDETEKSI → Peringatan UI ✓
+/**
+ * Menghitung posisi Sirius (bintang tetap).
+ *
+ * @param {number}        jd
+ * @param {number}        lstDeg
+ * @param {number}        latDeg
+ * @param {HorizonConfig} hConfig
+ * @returns {Entity}
+ */
+function calcSiriusEntity(jd, lstDeg, latDeg, hConfig) {
+  let raDeg, decDeg;
 
+  try {
+    const result = swe.fixstar2_ut('Sirius', jd, 0);
+    const eq     = eclToEq(result.lon, result.lat);
+    raDeg        = eq.raDeg;
+    decDeg       = eq.decDeg;
+  } catch (e) {
+    // Fallback ke koordinat J2000
+    raDeg  = SIRIUS_FALLBACK.raDeg;
+    decDeg = SIRIUS_FALLBACK.decDeg;
+  }
 
-TEST 10: Matching Nearest-ORB
+  const { azDeg, altDeg } = eqToHz(raDeg, decDeg, lstDeg, latDeg);
+  const vec                = hzToVec(azDeg, altDeg);
+  const { isAbove, transitional } = evalHorizon(altDeg, hConfig);
 
-  θ = 60.4°
-  Sekstil (60°): deviation = 0.4°, ORB_seks = 1.0° → KANDIDAT
-  Kuintil (72°): deviation = 11.6° > ORB_kuin → bukan kandidat
-  
-  HASIL: Sekstil, orb 0.4° ✓
-```
+  return {
+    key          : 'SUI',
+    type         : ENTITY_TYPE.FIXED_STAR,
+    vec,
+    az           : azDeg,
+    alt          : altDeg,
+    isAbove,
+    transitional,
+    subLat       : decDeg,
+    subLon       : raDeg,
+  };
+}
 
-### 9.2 Verifikasi Hubungan Alt ↔ Aspek TZ
+// ------------------------------------------------------------
+// 4.5 KALKULASI SEMUA ENTITAS (ENTRY POINT)
+// ------------------------------------------------------------
 
-```
-Untuk verifikasi cepat menggunakan θ = 90° - Alt:
+/**
+ * Menghitung posisi seluruh 15 entitas.
+ *
+ * @param {number}        jd          - Julian Day
+ * @param {number}        latDeg      - latitude pengamat
+ * @param {number}        lonDeg      - longitude pengamat
+ * @param {number}        elevM       - elevasi pengamat (meter)
+ * @param {HorizonConfig} hConfig
+ * @returns {Entity[]}               - array 15 entitas (urutan ENTITY_KEYS)
+ */
+function calcAllEntities(jd, latDeg, lonDeg, elevM, hConfig) {
+  // Set toposentrik
+  swe.set_topo(lonDeg, latDeg, elevM);
 
-┌──────────────┬──────────┬──────────────────┬──────────────────┐
-│ Alt Objek    │ θ dr TZ  │ Aspek Cocok      │ Status di Matrix │
-├──────────────┼──────────┼──────────────────┼──────────────────┤
-│ +90° Zenith  │    0°    │ Konjungsi        │ Zenith Zone ✓   │
-│ +30°         │   60°    │ Sekstil          │ Zenith Zone ✓   │
-│ +18°         │   72°    │ Kuintil          │ Zenith Zone ✓   │
-│  0° Horizon  │   90°    │ Kuadrat          │ Zenith Zone ✓   │
-│ -30°         │  120°    │ Trigon           │ Nadir Zone ✓    │
-│ -90° Nadir   │  180°    │ Oposisi          │ Nadir Zone ✓    │
-└──────────────┴──────────┴──────────────────┴──────────────────┘
+  const gmstDeg = calcGMST(jd);
+  const lstDeg  = calcLST(gmstDeg, lonDeg);
+
+  const entities = [];
+
+  for (const key of ENTITY_KEYS) {
+    let entity;
+
+    if (key === 'TZ' || key === 'TN' || key === 'CZ' || key === 'CN') {
+      entity = makePersonaEntity(key, latDeg, lonDeg);
+
+    } else if (key === 'SUI') {
+      entity = calcSiriusEntity(jd, lstDeg, latDeg, hConfig);
+
+    } else {
+      entity = calcPlanetEntity(jd, key, lstDeg, latDeg, hConfig);
+    }
+
+    entities.push(entity);
+  }
+
+  return entities;
+}
 ```
 
 ---
 
-## RINGKASAN SISTEM
+## BAB 5: GREAT-CIRCLE SEPARATION
+
+```js
+// ============================================================
+// BAB 5 — GREAT-CIRCLE SEPARATION
+// ============================================================
+
+/**
+ * Menghitung sudut separasi Great-Circle antara dua unit vector.
+ *
+ * Formula:
+ *   D = v1 · v2  (dot product)
+ *   θ = arccos(clamp(D, -1, +1)) × (180/π)
+ *
+ * Rentang hasil: [0°, 180°]
+ * Simetris: gcSep(A, B) === gcSep(B, A)
+ *
+ * @param {number[]} v1   - unit vector [x, y, z]
+ * @param {number[]} v2   - unit vector [x, y, z]
+ * @returns {number}      - sudut dalam derajat
+ */
+function gcSep(v1, v2) {
+  const dot    = v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+  const dotC   = Math.max(-1, Math.min(1, dot));   // clamp anti-NaN
+  return Math.acos(dotC) * ASTRO_CONST.RAD_TO_DEG;
+}
+
+/**
+ * Verifikasi bahwa vektor adalah unit vector (|v| ≈ 1).
+ * Digunakan untuk debugging dan validasi pipeline.
+ *
+ * @param {number[]} v
+ * @param {number}   [tol=1e-9]
+ * @returns {boolean}
+ */
+function isUnitVector(v, tol = 1e-9) {
+  const mag = Math.sqrt(v[0]**2 + v[1]**2 + v[2]**2);
+  return Math.abs(mag - 1) < tol;
+}
+
+/**
+ * Hitung θ antara TZ/TN dan suatu objek menggunakan
+ * shortcut altitude (lebih cepat dari gcSep penuh).
+ *
+ * θ(TZ, X) = 90° - Alt_X
+ * θ(TN, X) = 90° + Alt_X
+ *
+ * @param {boolean} isTZ    - true=TZ, false=TN
+ * @param {number}  altDeg  - altitude objek X
+ * @returns {number}
+ */
+function thetaFromAlt(isTZ, altDeg) {
+  return isTZ ? (90 - altDeg) : (90 + altDeg);
+}
+```
+
+---
+
+## BAB 6: MATCHING ASPEK
+
+```js
+// ============================================================
+// BAB 6 — MATCHING ASPEK
+// ============================================================
+
+/**
+ * AspectMatch — hasil matching aspek untuk satu pasangan.
+ * @typedef {Object} AspectMatch
+ * @property {string} id
+ * @property {string} name
+ * @property {number} angle
+ * @property {string} symbol
+ * @property {string} color
+ * @property {number} orbUsed      - nilai ORB yang digunakan
+ * @property {number} deviation    - |θ - angle| aktual
+ */
+
+/**
+ * Mencari aspek yang cocok untuk sudut θ.
+ *
+ * Algoritma:
+ *   Iterasi semua aspek (utama + custom aktif).
+ *   Hitung deviasi dari setiap aspek.
+ *   Pilih aspek dengan deviasi terkecil yang masih ≤ ORB.
+ *
+ * @param {number}    theta        - sudut separasi aktual (°)
+ * @param {OrbConfig} orbConfig    - konfigurasi ORB
+ * @param {number}    [orbScale=1] - faktor skala ORB (cross-dome)
+ * @returns {AspectMatch|null}
+ */
+function matchAspect(theta, orbConfig, orbScale = 1) {
+  const allAspects = getAllAspects();
+
+  let best          = null;
+  let bestDeviation = Infinity;
+
+  for (const aspect of allAspects) {
+    const orbBase   = getOrb(aspect.id, orbConfig);
+    const orb       = orbBase * orbScale;
+    const deviation = Math.abs(theta - aspect.angle);
+
+    if (deviation <= orb && deviation < bestDeviation) {
+      bestDeviation = deviation;
+      best = {
+        id        : aspect.id,
+        name      : aspect.name,
+        angle     : aspect.angle,
+        symbol    : aspect.symbol,
+        color     : aspect.color,
+        orbUsed   : orb,
+        deviation,
+      };
+    }
+  }
+
+  return best;
+}
+```
+
+---
+
+## BAB 7: MATRIKS 1 — INTRA-DOME
+
+```js
+// ============================================================
+// BAB 7 — MATRIKS 1 (INTRA-DOME)
+// ============================================================
+
+// ------------------------------------------------------------
+// 7.1 TIPE SEL
+// ------------------------------------------------------------
+
+/**
+ * CellType — jenis isi sel Matriks 1
+ */
+const CELL_TYPE = {
+  DIAGONAL   : 'diagonal',   // self vs self
+  BLOCKED    : 'blocked',    // entitas tidak di zona yang tepat (×)
+  ASPECT     : 'aspect',     // aspek terdeteksi
+  THETA_ONLY : 'theta_only', // aktif tapi tidak ada aspek
+};
+
+/**
+ * MatrixCell — isi satu sel Matriks 1
+ * @typedef {Object} MatrixCell
+ * @property {number}          i
+ * @property {number}          j
+ * @property {string}          zone       - 'zenith'|'nadir'|'diagonal'
+ * @property {string}          cellType   - CELL_TYPE.*
+ * @property {number|null}     theta      - null jika diagonal/blocked
+ * @property {AspectMatch|null} aspect
+ */
+
+// ------------------------------------------------------------
+// 7.2 KALKULASI MATRIKS 1
+// ------------------------------------------------------------
+
+/**
+ * Menghitung seluruh sel Matriks 1 (15×15 = 225 sel).
+ *
+ * Layout:
+ *   j > i → Zenith Zone (segitiga atas)
+ *   j < i → Nadir Zone  (segitiga bawah)
+ *   j = i → Diagonal    (hitam)
+ *
+ * @param {Entity[]}  entities    - array 15 entitas
+ * @param {OrbConfig} orbConfig
+ * @returns {MatrixCell[][]}      - grid [15][15]
+ */
+function calcMatrix1(entities, orbConfig) {
+  const N    = ENTITY_COUNT;
+  const grid = [];
+
+  for (let i = 0; i < N; i++) {
+    grid[i] = [];
+
+    for (let j = 0; j < N; j++) {
+      // DIAGONAL
+      if (i === j) {
+        grid[i][j] = {
+          i, j,
+          zone     : 'diagonal',
+          cellType : CELL_TYPE.DIAGONAL,
+          theta    : null,
+          aspect   : null,
+        };
+        continue;
+      }
+
+      // Tentukan zona berdasarkan posisi relatif i,j
+      const zone = j > i ? 'zenith' : 'nadir';
+
+      const eA = entities[i];
+      const eB = entities[j];
+
+      // Filter zona
+      let active;
+      if (zone === 'zenith') {
+        active = isZenithSide(eA) && isZenithSide(eB);
+      } else {
+        active = isNadirSide(eA) && isNadirSide(eB);
+      }
+
+      if (!active) {
+        grid[i][j] = {
+          i, j, zone,
+          cellType : CELL_TYPE.BLOCKED,
+          theta    : null,
+          aspect   : null,
+        };
+        continue;
+      }
+
+      // Hitung θ
+      const theta  = gcSep(eA.vec, eB.vec);
+      const aspect = matchAspect(theta, orbConfig);
+
+      grid[i][j] = {
+        i, j, zone,
+        cellType : aspect ? CELL_TYPE.ASPECT : CELL_TYPE.THETA_ONLY,
+        theta,
+        aspect,
+      };
+    }
+  }
+
+  return grid;
+}
+
+// ------------------------------------------------------------
+// 7.3 HELPER QUERY MATRIKS 1
+// ------------------------------------------------------------
+
+/**
+ * Mengambil semua sel dengan aspek aktif dari satu zona.
+ *
+ * @param {MatrixCell[][]} grid
+ * @param {'zenith'|'nadir'} zone
+ * @returns {MatrixCell[]}
+ */
+function getAspectCells(grid, zone) {
+  const result = [];
+  for (let i = 0; i < ENTITY_COUNT; i++) {
+    for (let j = 0; j < ENTITY_COUNT; j++) {
+      const cell = grid[i][j];
+      if (cell.zone === zone && cell.cellType === CELL_TYPE.ASPECT) {
+        result.push(cell);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Mengambil semua sel aktif (aspek maupun theta_only) dari satu zona.
+ *
+ * @param {MatrixCell[][]} grid
+ * @param {'zenith'|'nadir'} zone
+ * @returns {MatrixCell[]}
+ */
+function getActiveCells(grid, zone) {
+  const result = [];
+  for (let i = 0; i < ENTITY_COUNT; i++) {
+    for (let j = 0; j < ENTITY_COUNT; j++) {
+      const cell = grid[i][j];
+      if (
+        cell.zone === zone &&
+        (cell.cellType === CELL_TYPE.ASPECT ||
+         cell.cellType === CELL_TYPE.THETA_ONLY)
+      ) {
+        result.push(cell);
+      }
+    }
+  }
+  return result;
+}
+```
+
+---
+
+## BAB 8: MATRIKS 2 — θ RAW
+
+```js
+// ============================================================
+// BAB 8 — MATRIKS 2 (θ RAW)
+// ============================================================
+
+/**
+ * RawCell — isi sel Matriks 2
+ * @typedef {Object} RawCell
+ * @property {number}          i
+ * @property {number}          j
+ * @property {number|null}     theta    - null jika diagonal
+ * @property {AspectMatch|null} aspect  - null jika tidak ada aspek
+ */
+
+/**
+ * Menghitung Matriks 2 — sudut mentah untuk SEMUA 210 pasangan.
+ * Tidak ada filter zona. Diagonal tetap null.
+ *
+ * @param {Entity[]}  entities
+ * @param {OrbConfig} orbConfig   - untuk overlay warna aspek (opsional)
+ * @returns {RawCell[][]}         - grid [15][15]
+ */
+function calcMatrix2(entities, orbConfig) {
+  const N    = ENTITY_COUNT;
+  const grid = [];
+
+  for (let i = 0; i < N; i++) {
+    grid[i] = [];
+
+    for (let j = 0; j < N; j++) {
+      if (i === j) {
+        grid[i][j] = { i, j, theta: null, aspect: null };
+        continue;
+      }
+
+      const theta  = gcSep(entities[i].vec, entities[j].vec);
+      const aspect = matchAspect(theta, orbConfig);
+
+      grid[i][j] = { i, j, theta, aspect };
+    }
+  }
+
+  return grid;
+}
+```
+
+---
+
+## BAB 9: MATRIKS 3 — CROSS-DOME
+
+```js
+// ============================================================
+// BAB 9 — MATRIKS 3 (CROSS-DOME)
+// ============================================================
+
+// ------------------------------------------------------------
+// 9.1 TIPE DATA CROSS-DOME
+// ------------------------------------------------------------
+
+/**
+ * CrossDomeCell — satu sel Matriks 3
+ * @typedef {Object} CrossDomeCell
+ * @property {number}          iZen      - index entitas Zenith Side
+ * @property {number}          iNad      - index entitas Nadir Side
+ * @property {string}          keyZen    - key entitas Zenith Side
+ * @property {string}          keyNad    - key entitas Nadir Side
+ * @property {number}          theta
+ * @property {AspectMatch|null} aspect
+ * @property {boolean}         transitionalZen
+ * @property {boolean}         transitionalNad
+ */
+
+/**
+ * CrossDomeMatrix — output Matriks 3
+ * @typedef {Object} CrossDomeMatrix
+ * @property {string[]}         zenithKeys   - label baris
+ * @property {string[]}         nadirKeys    - label kolom
+ * @property {number[]}         zenithIdx    - index di entities[]
+ * @property {number[]}         nadirIdx     - index di entities[]
+ * @property {CrossDomeCell[][]} grid        - [R][C]
+ * @property {number}           R            - jumlah baris
+ * @property {number}           C            - jumlah kolom
+ */
+
+// ------------------------------------------------------------
+// 9.2 KALKULASI MATRIKS 3
+// ------------------------------------------------------------
+
+/**
+ * Menghitung Matriks 3 — Cross-Dome.
+ *
+ * Baris = entitas Zenith Side
+ * Kolom = entitas Nadir Side
+ *
+ * Semua sel selalu terisi (tidak ada sel ×)
+ * karena kedua entitas sudah terkonfirmasi di kubah berbeda.
+ *
+ * @param {Entity[]}         entities
+ * @param {OrbConfig}        orbConfig
+ * @param {CrossDomeConfig}  cdConfig
+ * @returns {CrossDomeMatrix}
+ */
+function calcMatrix3(entities, orbConfig, cdConfig) {
+
+  // Pisahkan entitas berdasarkan zona
+  const zenithSide = [];   // { idx, entity }
+  const nadirSide  = [];
+
+  for (let idx = 0; idx < entities.length; idx++) {
+    const e = entities[idx];
+
+    if (isZenithSide(e)) {
+      // Sertakan transitional di baris hanya jika dikonfigurasi
+      if (!e.transitional || cdConfig.show_transitional_row) {
+        zenithSide.push({ idx, entity: e });
+      }
+    } else if (isNadirSide(e)) {
+      if (!e.transitional || cdConfig.show_transitional_row) {
+        nadirSide.push({ idx, entity: e });
+      }
+    }
+    // Entitas transitional yang dikecualikan tidak masuk ke mana pun
+  }
+
+  const R = zenithSide.length;
+  const C = nadirSide.length;
+
+  // Tentukan skala ORB untuk cross-dome
+  const orbScale = cdConfig.use_same_orb ? 1.0 : cdConfig.cross_orb_scale;
+
+  // Bangun grid [R][C]
+  const grid = [];
+
+  for (let r = 0; r < R; r++) {
+    grid[r] = [];
+
+    const { idx: iZen, entity: eZen } = zenithSide[r];
+
+    for (let c = 0; c < C; c++) {
+      const { idx: iNad, entity: eNad } = nadirSide[c];
+
+      const theta = gcSep(eZen.vec, eNad.vec);
+
+      const aspect = cdConfig.match_aspects
+        ? matchAspect(theta, orbConfig, orbScale)
+        : null;
+
+      grid[r][c] = {
+        iZen,
+        iNad,
+        keyZen           : eZen.key,
+        keyNad           : eNad.key,
+        theta,
+        aspect,
+        transitionalZen  : eZen.transitional,
+        transitionalNad  : eNad.transitional,
+      };
+    }
+  }
+
+  return {
+    zenithKeys : zenithSide.map(z => z.entity.key),
+    nadirKeys  : nadirSide.map(n => n.entity.key),
+    zenithIdx  : zenithSide.map(z => z.idx),
+    nadirIdx   : nadirSide.map(n => n.idx),
+    grid,
+    R,
+    C,
+  };
+}
+
+// ------------------------------------------------------------
+// 9.3 HELPER QUERY MATRIKS 3
+// ------------------------------------------------------------
+
+/**
+ * Mengambil semua sel Matriks 3 yang memiliki aspek aktif.
+ *
+ * @param {CrossDomeMatrix} matrix3
+ * @returns {CrossDomeCell[]}
+ */
+function getCrossDomeAspectCells(matrix3) {
+  const result = [];
+  for (let r = 0; r < matrix3.R; r++) {
+    for (let c = 0; c < matrix3.C; c++) {
+      const cell = matrix3.grid[r][c];
+      if (cell.aspect !== null) result.push(cell);
+    }
+  }
+  return result;
+}
+
+/**
+ * Mengambil semua nilai θ dari Matriks 3 (flat array).
+ *
+ * @param {CrossDomeMatrix} matrix3
+ * @returns {number[]}
+ */
+function getCrossDomeThetaList(matrix3) {
+  const result = [];
+  for (let r = 0; r < matrix3.R; r++) {
+    for (let c = 0; c < matrix3.C; c++) {
+      result.push(matrix3.grid[r][c].theta);
+    }
+  }
+  return result;
+}
+```
+
+---
+
+## BAB 10: DETEKTOR ANOMALI KUBAH
+
+```js
+// ============================================================
+// BAB 10 — DETEKTOR ANOMALI KUBAH
+// ============================================================
+
+// ------------------------------------------------------------
+// 10.1 TIPE DATA ANOMALI
+// ------------------------------------------------------------
+
+/**
+ * IdentikGroup — kelompok pasangan dengan θ identik
+ * @typedef {Object} IdentikGroup
+ * @property {number}   theta      - nilai θ representatif
+ * @property {Array}    pairs      - [{keyA, keyB, theta}, ...]
+ * @property {number}   count
+ */
+
+/**
+ * DomeAnomalyResult — hasil deteksi anomali satu kubah
+ * @typedef {Object} DomeAnomalyResult
+ * @property {number}         aspekCount
+ * @property {boolean}        aspekFlag
+ * @property {number}         identikCount    - total pasangan di grup identik
+ * @property {boolean}        identikFlag
+ * @property {IdentikGroup[]} identikGroups
+ */
+
+// ------------------------------------------------------------
+// 10.2 DETEKSI ANOMALI TIPE 1 — KEPADATAN ASPEK
+// ------------------------------------------------------------
+
+/**
+ * Menghitung anomali kepadatan aspek pada satu kubah.
+ *
+ * @param {MatrixCell[]} aspectCells   - sel yang memiliki aspek aktif
+ * @param {number}        threshold    - N_Aspek
+ * @returns {{ count: number, flag: boolean }}
+ */
+function detectAnomalyAspek(aspectCells, threshold) {
+  const count = aspectCells.length;
+  return {
+    count,
+    flag : count >= threshold,
+  };
+}
+
+// ------------------------------------------------------------
+// 10.3 DETEKSI ANOMALI TIPE 2 — SUDUT IDENTIK
+// ------------------------------------------------------------
+
+/**
+ * Mengelompokkan nilai θ yang identik dalam ±tolerance.
+ * Menggunakan bucketing dengan resolusi tolerance.
+ *
+ * @param {Array<{keyA: string, keyB: string, theta: number}>} thetaPairs
+ * @param {number} tolerance   - default 0.1°
+ * @returns {IdentikGroup[]}
+ */
+function groupIdenticalTheta(thetaPairs, tolerance = 0.1) {
+  const bucketMap = new Map();
+
+  for (const pair of thetaPairs) {
+    // Pembulatan ke nearest tolerance
+    const bucketKey = Math.round(pair.theta / tolerance) * tolerance;
+    const keyStr    = bucketKey.toFixed(1);
+
+    if (!bucketMap.has(keyStr)) {
+      bucketMap.set(keyStr, {
+        theta : bucketKey,
+        pairs : [],
+        count : 0,
+      });
+    }
+
+    const group = bucketMap.get(keyStr);
+    group.pairs.push(pair);
+    group.count++;
+  }
+
+  // Hanya return grup dengan ≥ 2 pasangan (berarti ada yang identik)
+  return Array.from(bucketMap.values()).filter(g => g.count >= 2);
+}
+
+/**
+ * Menghitung anomali sudut identik pada satu kubah.
+ *
+ * @param {MatrixCell[]} activeCells     - semua sel aktif kubah
+ * @param {Entity[]}      entities
+ * @param {AnomalyConfig} anomalyConfig
+ * @returns {{ count: number, flag: boolean, groups: IdentikGroup[] }}
+ */
+function detectAnomalyIdentik(activeCells, entities, anomalyConfig) {
+  const { threshold, tolerance } = anomalyConfig.n_identik;
+
+  // Kumpulkan pasangan θ dari sel aktif
+  const thetaPairs = activeCells.map(cell => ({
+    keyA  : entities[cell.i].key,
+    keyB  : entities[cell.j].key,
+    theta : cell.theta,
+  }));
+
+  const groups      = groupIdenticalTheta(thetaPairs, tolerance);
+  const totalPairs  = groups.reduce((sum, g) => sum + g.count, 0);
+
+  return {
+    count  : totalPairs,
+    flag   : totalPairs >= threshold,
+    groups,
+  };
+}
+
+// ------------------------------------------------------------
+// 10.4 DETEKSI ANOMALI LENGKAP — SATU KUBAH
+// ------------------------------------------------------------
+
+/**
+ * Menjalankan seluruh deteksi anomali untuk satu kubah.
+ *
+ * @param {MatrixCell[][]} grid
+ * @param {'zenith'|'nadir'} zone
+ * @param {Entity[]}     entities
+ * @param {AnomalyConfig} anomalyConfig
+ * @returns {DomeAnomalyResult}
+ */
+function detectDomeAnomaly(grid, zone, entities, anomalyConfig) {
+  if (!anomalyConfig.enabled) {
+    return {
+      aspekCount   : 0, aspekFlag   : false,
+      identikCount : 0, identikFlag : false,
+      identikGroups: [],
+    };
+  }
+
+  const aspectCells = getAspectCells(grid, zone);
+  const activeCells = getActiveCells(grid, zone);
+
+  // Anomali Tipe 1
+  const anomalyAspek = anomalyConfig.n_aspek.enabled
+    ? detectAnomalyAspek(aspectCells, anomalyConfig.n_aspek.threshold)
+    : { count: 0, flag: false };
+
+  // Anomali Tipe 2
+  const anomalyIdentik = anomalyConfig.n_identik.enabled
+    ? detectAnomalyIdentik(activeCells, entities, anomalyConfig)
+    : { count: 0, flag: false, groups: [] };
+
+  return {
+    aspekCount    : anomalyAspek.count,
+    aspekFlag     : anomalyAspek.flag,
+    identikCount  : anomalyIdentik.count,
+    identikFlag   : anomalyIdentik.flag,
+    identikGroups : anomalyIdentik.groups,
+  };
+}
+
+// ------------------------------------------------------------
+// 10.5 DETEKSI ANOMALI CROSS-DOME (OPSIONAL)
+// ------------------------------------------------------------
+
+/**
+ * Mendeteksi anomali pada Matriks 3 (Cross-Dome).
+ *
+ * @param {CrossDomeMatrix} matrix3
+ * @param {AnomalyConfig}   anomalyConfig
+ * @returns {DomeAnomalyResult}
+ */
+function detectCrossDomeAnomaly(matrix3, anomalyConfig) {
+  const cdConfig = anomalyConfig.crossdome;
+
+  if (!cdConfig.enabled) {
+    return {
+      aspekCount   : 0, aspekFlag   : false,
+      identikCount : 0, identikFlag : false,
+      identikGroups: [],
+    };
+  }
+
+  const allCells = [];
+  for (let r = 0; r < matrix3.R; r++) {
+    for (let c = 0; c < matrix3.C; c++) {
+      allCells.push(matrix3.grid[r][c]);
+    }
+  }
+
+  const aspectCells   = allCells.filter(cell => cell.aspect !== null);
+  const anomalyAspek  = cdConfig.n_aspek.enabled
+    ? detectAnomalyAspek(aspectCells, cdConfig.n_aspek.threshold)
+    : { count: 0, flag: false };
+
+  // Siapkan thetaPairs untuk identik check
+  const thetaPairs = allCells.map(cell => ({
+    keyA  : cell.keyZen,
+    keyB  : cell.keyNad,
+    theta : cell.theta,
+  }));
+
+  const groups     = cdConfig.n_identik.enabled
+    ? groupIdenticalTheta(thetaPairs, cdConfig.n_identik.tolerance)
+    : [];
+  const totalPairs = groups.reduce((sum, g) => sum + g.count, 0);
+
+  const anomalyIdentik = {
+    count : totalPairs,
+    flag  : cdConfig.n_identik.enabled && totalPairs >= cdConfig.n_identik.threshold,
+    groups,
+  };
+
+  return {
+    aspekCount    : anomalyAspek.count,
+    aspekFlag     : anomalyAspek.flag,
+    identikCount  : anomalyIdentik.count,
+    identikFlag   : anomalyIdentik.flag,
+    identikGroups : anomalyIdentik.groups,
+  };
+}
+
+// ------------------------------------------------------------
+// 10.6 FORMAT LAPORAN ANOMALI
+// ------------------------------------------------------------
+
+/**
+ * Menghasilkan string laporan anomali yang terformat.
+ *
+ * @param {DomeAnomalyResult} result
+ * @param {'zenith'|'nadir'|'crossdome'} dome
+ * @param {string}            isoTimestamp
+ * @param {number}            lat
+ * @param {number}            lon
+ * @returns {string}
+ */
+function formatAnomalyReport(result, dome, isoTimestamp, lat, lon) {
+  const domeLabel = {
+    zenith    : 'ZENITH',
+    nadir     : 'NADIR',
+    crossdome : 'CROSS-DOME',
+  }[dome] || dome.toUpperCase();
+
+  const lines = [
+    'ANOMALI TERDETEKSI',
+    '══════════════════════════════════════════',
+    `Waktu  : ${isoTimestamp}`,
+    `Kubah  : ${domeLabel}`,
+    `Lokasi : ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`,
+    '',
+    'Tipe 1 — KEPADATAN ASPEK:',
+    `  Status : ${result.aspekFlag ? 'AKTIF ⚠' : 'Normal'}`,
+    `  Jumlah : ${result.aspekCount} aspek aktif`,
+    '',
+    'Tipe 2 — SUDUT IDENTIK:',
+    `  Status : ${result.identikFlag ? 'AKTIF ⚠' : 'Normal'}`,
+    `  Jumlah : ${result.identikCount} pasangan identik`,
+  ];
+
+  if (result.identikGroups.length > 0) {
+    lines.push('  Simpul :');
+    for (const group of result.identikGroups) {
+      const pairList = group.pairs
+        .map(p => `${p.keyA}—${p.keyB}`)
+        .join(', ');
+      lines.push(`    → θ ≈ ${group.theta.toFixed(1)}° : ${pairList}`);
+    }
+  }
+
+  lines.push('══════════════════════════════════════════');
+
+  return lines.join('\n');
+}
+```
+
+---
+
+## BAB 11: FRAME RUNNER (ORKESTRASI)
+
+```js
+// ============================================================
+// BAB 11 — FRAME RUNNER
+// ============================================================
+
+// ------------------------------------------------------------
+// 11.1 TIPE DATA FRAME RESULT
+// ------------------------------------------------------------
+
+/**
+ * FrameResult — output lengkap satu frame kalkulasi
+ * @typedef {Object} FrameResult
+ * @property {string}            timestamp
+ * @property {number}            jd
+ * @property {number}            gmstDeg
+ * @property {number}            lstDeg
+ * @property {number}            horizonThreshold
+ * @property {Entity[]}          entities
+ * @property {MatrixCell[][]}    matrix1
+ * @property {RawCell[][]}       matrix2
+ * @property {CrossDomeMatrix}   matrix3
+ * @property {Object}            anomaly
+ */
+
+// ------------------------------------------------------------
+// 11.2 KONFIGURASI SISTEM TERPUSAT
+// ------------------------------------------------------------
+
+/**
+ * SystemConfig — konfigurasi lengkap sistem DOF·ASTRO
+ * @typedef {Object} SystemConfig
+ * @property {HorizonConfig}   horizon
+ * @property {OrbConfig}       orb
+ * @property {AnomalyConfig}   anomaly
+ * @property {CrossDomeConfig} crossdome
+ */
+
+/** @type {SystemConfig} */
+const systemConfig = {
+  horizon   : { ...DEFAULT_HORIZON_CONFIG },
+  orb       : { ...DEFAULT_ORB_CONFIG },
+  anomaly   : structuredClone(DEFAULT_ANOMALY_CONFIG),
+  crossdome : { ...DEFAULT_CROSSDOME_CONFIG },
+};
+
+// ------------------------------------------------------------
+// 11.3 FUNGSI UTAMA — runFrame
+// ------------------------------------------------------------
+
+/**
+ * Menjalankan satu siklus kalkulasi lengkap DOF·ASTRO.
+ *
+ * Urutan eksekusi:
+ *   1. Parse waktu → JD, GMST, LST
+ *   2. Hitung posisi 15 entitas
+ *   3. Hitung Matriks 1 (intra-dome)
+ *   4. Hitung Matriks 2 (θ raw)
+ *   5. Hitung Matriks 3 (cross-dome)
+ *   6. Deteksi anomali (zenith + nadir + crossdome)
+ *   7. Validasi konflik ORB
+ *   8. Return FrameResult
+ *
+ * @param {Object}       timeParams
+ * @param {number}       timeParams.year
+ * @param {number}       timeParams.month
+ * @param {number}       timeParams.day
+ * @param {number}       timeParams.hourUTC     - jam desimal UTC
+ * @param {Object}       locParams
+ * @param {number}       locParams.lat
+ * @param {number}       locParams.lon
+ * @param {number}       locParams.elev
+ * @param {SystemConfig} config
+ * @returns {FrameResult}
+ */
+function runFrame(timeParams, locParams, config) {
+  const { year, month, day, hourUTC } = timeParams;
+  const { lat, lon, elev }            = locParams;
+
+  // STEP 1: Waktu
+  const jd      = calcJD(year, month, day, hourUTC);
+  const gmstDeg = calcGMST(jd);
+  const lstDeg  = calcLST(gmstDeg, lon);
+
+  const timestamp = buildISOTimestamp(year, month, day, hourUTC);
+
+  // STEP 2: Posisi 15 entitas
+  const entities = calcAllEntities(jd, lat, lon, elev, config.horizon);
+
+  // STEP 3: Matriks 1
+  const matrix1 = calcMatrix1(entities, config.orb);
+
+  // STEP 4: Matriks 2
+  const matrix2 = calcMatrix2(entities, config.orb);
+
+  // STEP 5: Matriks 3 (jika aktif)
+  const matrix3 = config.crossdome.enabled
+    ? calcMatrix3(entities, config.orb, config.crossdome)
+    : null;
+
+  // STEP 6: Anomali
+  const anomalyZenith = detectDomeAnomaly(
+    matrix1, 'zenith', entities, config.anomaly
+  );
+  const anomalyNadir = detectDomeAnomaly(
+    matrix1, 'nadir', entities, config.anomaly
+  );
+  const anomalyCrossDome = (matrix3 && config.anomaly.crossdome.enabled)
+    ? detectCrossDomeAnomaly(matrix3, config.anomaly)
+    : null;
+
+  // STEP 7: Validasi ORB (side-effect: warning saja)
+  const orbConflicts = validateOrbConflicts(config.orb);
+
+  return {
+    timestamp,
+    jd,
+    gmstDeg,
+    lstDeg,
+    horizonThreshold : config.horizon.threshold,
+    entities,
+    matrix1,
+    matrix2,
+    matrix3,
+    anomaly : {
+      zenith    : anomalyZenith,
+      nadir     : anomalyNadir,
+      crossdome : anomalyCrossDome,
+    },
+    orbConflicts,
+  };
+}
+
+// ------------------------------------------------------------
+// 11.4 HELPER TIMESTAMP
+// ------------------------------------------------------------
+
+/**
+ * Membangun ISO 8601 timestamp dari komponen waktu UTC.
+ *
+ * @param {number} year
+ * @param {number} month
+ * @param {number} day
+ * @param {number} hourUTC   - jam desimal
+ * @returns {string}         - "YYYY-MM-DDTHH:MM:SSZ"
+ */
+function buildISOTimestamp(year, month, day, hourUTC) {
+  const h   = Math.floor(hourUTC);
+  const m   = Math.floor((hourUTC - h) * 60);
+  const s   = Math.floor(((hourUTC - h) * 60 - m) * 60);
+
+  const pad = n => String(n).padStart(2, '0');
+
+  return `${year}-${pad(month)}-${pad(day)}` +
+         `T${pad(h)}:${pad(m)}:${pad(s)}Z`;
+}
+
+// ------------------------------------------------------------
+// 11.5 LIVE MODE — Interval Runner
+// ------------------------------------------------------------
+
+/**
+ * State live mode
+ */
+const liveState = {
+  running    : false,
+  intervalId : null,
+  intervalMs : 1000,   // default update setiap 1 detik
+};
+
+/**
+ * Memulai live mode — runFrame dipanggil otomatis setiap interval.
+ *
+ * @param {Object}       locParams
+ * @param {SystemConfig} config
+ * @param {Function}     onFrame    - callback(FrameResult)
+ * @param {number}       [intervalMs=1000]
+ */
+function startLiveMode(locParams, config, onFrame, intervalMs = 1000) {
+  if (liveState.running) stopLiveMode();
+
+  liveState.running    = true;
+  liveState.intervalMs = intervalMs;
+
+  const tick = () => {
+    const now   = new Date();
+    const timeP = {
+      year    : now.getUTCFullYear(),
+      month   : now.getUTCMonth() + 1,
+      day     : now.getUTCDate(),
+      hourUTC : now.getUTCHours()
+               + now.getUTCMinutes() / 60
+               + now.getUTCSeconds() / 3600,
+    };
+    const result = runFrame(timeP, locParams, config);
+    onFrame(result);
+  };
+
+  tick(); // langsung jalankan sekali
+  liveState.intervalId = setInterval(tick, intervalMs);
+}
+
+/**
+ * Menghentikan live mode.
+ */
+function stopLiveMode() {
+  if (liveState.intervalId) {
+    clearInterval(liveState.intervalId);
+    liveState.intervalId = null;
+  }
+  liveState.running = false;
+}
+```
+
+---
+
+## BAB 12: VALIDASI & TEST CASES
+
+```js
+// ============================================================
+// BAB 12 — VALIDASI & TEST CASES
+// ============================================================
+
+// ------------------------------------------------------------
+// 12.1 FRAMEWORK TEST MINIMAL
+// ------------------------------------------------------------
+
+/**
+ * Hasil satu test case
+ * @typedef {Object} TestResult
+ * @property {string}  name
+ * @property {boolean} passed
+ * @property {string}  detail
+ */
+
+/** @type {TestResult[]} */
+const testResults = [];
+
+/**
+ * Menjalankan satu assertion dan mencatat hasilnya.
+ *
+ * @param {string}  name
+ * @param {boolean} condition
+ * @param {string}  detail
+ */
+function assert(name, condition, detail = '') {
+  testResults.push({
+    name,
+    passed : condition,
+    detail,
+  });
+  const icon = condition ? '✓' : '✗';
+  console.log(`${icon} ${name}${detail ? ' — ' + detail : ''}`);
+}
+
+/**
+ * Membandingkan dua angka dengan toleransi.
+ *
+ * @param {number} a
+ * @param {number} b
+ * @param {number} [tol=0.001]
+ * @returns {boolean}
+ */
+function approxEq(a, b, tol = 0.001) {
+  return Math.abs(a - b) <= tol;
+}
+
+// ------------------------------------------------------------
+// 12.2 TEST CASES GEOMETRI DASAR
+// ------------------------------------------------------------
+
+function runGeometryTests() {
+  console.log('\n── GEOMETRI DASAR ──');
+
+  // T1: Konjungsi TZ-Planet tepat di Zenith (Alt=90°)
+  {
+    const vTZ = [0, 0, 1];
+    const vX  = hzToVec(0, 90);   // Alt=90° → v=[0,0,1]
+    const theta = gcSep(vTZ, vX);
+    assert('T1: Konjungsi TZ-Zenith', approxEq(theta, 0),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T2: Kuadrat TZ-Planet di Horizon (Alt=0°)
+  {
+    const vTZ = [0, 0, 1];
+    const vX  = hzToVec(90, 0);   // Az=90° (Timur), Alt=0°
+    const theta = gcSep(vTZ, vX);
+    assert('T2: Kuadrat TZ-Horizon', approxEq(theta, 90),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T3: Sekstil TZ-Planet (Alt=+30°)
+  {
+    const vTZ   = [0, 0, 1];
+    const vX    = hzToVec(0, 30);
+    const theta = gcSep(vTZ, vX);
+    assert('T3: Sekstil TZ-Alt30', approxEq(theta, 60),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T4: Trigon TZ-Planet (Alt=-30°) → zona Nadir
+  {
+    const vTZ   = [0, 0, 1];
+    const vX    = hzToVec(0, -30);
+    const theta = gcSep(vTZ, vX);
+    assert('T4: Trigon TZ-AltMinus30', approxEq(theta, 120),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T5: Oposisi TZ-TN (selalu)
+  {
+    const vTZ   = [0, 0,  1];
+    const vTN   = [0, 0, -1];
+    const theta = gcSep(vTZ, vTN);
+    assert('T5: Oposisi TZ-TN', approxEq(theta, 180),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T6: Konjungsi TZ-CZ (selalu)
+  {
+    const vTZ   = [0, 0, 1];
+    const vCZ   = [0, 0, 1];
+    const theta = gcSep(vTZ, vCZ);
+    assert('T6: Konjungsi TZ-CZ', approxEq(theta, 0),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T7: Kuintil TZ-Planet (Alt=+18°)
+  {
+    const vTZ   = [0, 0, 1];
+    const vX    = hzToVec(0, 18);
+    const theta = gcSep(vTZ, vX);
+    assert('T7: Kuintil TZ-Alt18', approxEq(theta, 72),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T8: Oposisi TZ-Planet (Alt=-90°, Nadir tepat)
+  {
+    const vTZ   = [0, 0,  1];
+    const vX    = hzToVec(0, -90);
+    const theta = gcSep(vTZ, vX);
+    assert('T8: Oposisi TZ-AltMinus90', approxEq(theta, 180),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T9: Simetri gcSep
+  {
+    const vA    = hzToVec(45, 23);
+    const vB    = hzToVec(210, -15);
+    const t_AB  = gcSep(vA, vB);
+    const t_BA  = gcSep(vB, vA);
+    assert('T9: Simetri gcSep', approxEq(t_AB, t_BA),
+      `gcSep(A,B)=${t_AB.toFixed(6)}, gcSep(B,A)=${t_BA.toFixed(6)}`);
+  }
+
+  // T10: Unit vector dari hzToVec
+  {
+    const v = hzToVec(135, 42);
+    assert('T10: Unit vector hzToVec', isUnitVector(v),
+      `|v|=${Math.sqrt(v[0]**2+v[1]**2+v[2]**2).toFixed(9)}`);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.3 TEST CASES HORIZON THRESHOLD
+// ------------------------------------------------------------
+
+function runHorizonTests() {
+  console.log('\n── HORIZON THRESHOLD ──');
+
+  const hConfig3 = { threshold: 3.0, unit: 'deg', show_transitional: true };
+
+  // T11: Tepat di threshold → isAbove
+  {
+    const r = evalHorizon(3.0, hConfig3);
+    assert('T11: Alt=threshold → isAbove=TRUE', r.isAbove === true,
+      `Alt=3.0, threshold=3.0`);
+  }
+
+  // T12: Di bawah threshold → isBelow
+  {
+    const r = evalHorizon(2.9, hConfig3);
+    assert('T12: Alt<threshold → isAbove=FALSE', r.isAbove === false,
+      `Alt=2.9, threshold=3.0`);
+  }
+
+  // T13: Transitional band atas
+  {
+    const r = evalHorizon(3.3, hConfig3);   // 0.3° dari threshold
+    assert('T13: Alt=3.3° (0.3° atas) → transitional=TRUE',
+      r.transitional === true, `|3.3-3.0|=0.3 < 0.5`);
+  }
+
+  // T14: Transitional band bawah
+  {
+    const r = evalHorizon(2.7, hConfig3);   // 0.3° dari threshold
+    assert('T14: Alt=2.7° (0.3° bawah) → transitional=TRUE',
+      r.transitional === true, `|2.7-3.0|=0.3 < 0.5`);
+  }
+
+  // T15: Jauh dari threshold → tidak transitional
+  {
+    const r = evalHorizon(10.0, hConfig3);
+    assert('T15: Alt=10° → transitional=FALSE',
+      r.transitional === false, `|10.0-3.0|=7.0 > 0.5`);
+  }
+
+  // T16: isZenithSide vs isNadirSide konsistensi
+  {
+    const eAbove = {
+      key:'SUN', type: ENTITY_TYPE.PLANET,
+      vec:[0,0,1], az:0, alt:25, isAbove:true, transitional:false,
+      subLat:0, subLon:0
+    };
+    const eBelow = { ...eAbove, alt:-10, isAbove:false };
+
+    assert('T16a: Planet isAbove → isZenithSide=TRUE',
+      isZenithSide(eAbove) === true);
+    assert('T16b: Planet isAbove → isNadirSide=FALSE',
+      isNadirSide(eAbove) === false);
+    assert('T16c: Planet !isAbove → isZenithSide=FALSE',
+      isZenithSide(eBelow) === false);
+    assert('T16d: Planet !isAbove → isNadirSide=TRUE',
+      isNadirSide(eBelow) === true);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.4 TEST CASES MATCHING ASPEK
+// ------------------------------------------------------------
+
+function runMatchingTests() {
+  console.log('\n── MATCHING ASPEK ──');
+
+  const orbCfg = {
+    mode          : 'custom',
+    default_value : 1.0,
+    custom_values : { konj:2.0, seks:1.0, kuin:1.0, kuad:1.5, trig:1.5, opos:2.0 },
+  };
+
+  // T17: Match Konjungsi tepat
+  {
+    const m = matchAspect(0.0, orbCfg);
+    assert('T17: Match θ=0° → Konjungsi', m && m.id === 'konj',
+      `matched: ${m?.name}`);
+  }
+
+  // T18: Match dalam ORB Sekstil
+  {
+    const m = matchAspect(60.4, orbCfg);
+    assert('T18: Match θ=60.4° → Sekstil (ORB=1.0°)', m && m.id === 'seks',
+      `dev=${m?.deviation.toFixed(3)}`);
+  }
+
+  // T19: Tidak cocok (di luar semua ORB)
+  {
+    const m = matchAspect(45.0, orbCfg);
+    assert('T19: θ=45° → tidak ada aspek', m === null);
+  }
+
+  // T20: Nearest-ORB — ambil deviasi terkecil
+  {
+    // θ = 60.4 → Sekstil dev=0.4°, Kuintil dev=11.6° → harus Sekstil
+    const m = matchAspect(60.4, orbCfg);
+    assert('T20: Nearest-ORB ambil Sekstil bukan Kuintil',
+      m && m.id === 'seks', `matched: ${m?.name}, dev=${m?.deviation.toFixed(3)}`);
+  }
+
+  // T21: Match Oposisi tepat
+  {
+    const m = matchAspect(180.0, orbCfg);
+    assert('T21: Match θ=180° → Oposisi', m && m.id === 'opos',
+      `matched: ${m?.name}`);
+  }
+
+  // T22: ORB mode default
+  {
+    const cfgDefault = { mode:'default', default_value:2.0, custom_values:{} };
+    const m = matchAspect(91.5, cfgDefault);   // dev=1.5° dari Kuadrat 90°
+    assert('T22: Default ORB=2° → Kuadrat pada θ=91.5°',
+      m && m.id === 'kuad', `matched: ${m?.name}, dev=${m?.deviation.toFixed(3)}`);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.5 TEST CASES ANOMALI
+// ------------------------------------------------------------
+
+function runAnomalyTests() {
+  console.log('\n── ANOMALI ──');
+
+  // T23: Anomali Aspek triggered
+  {
+    // Buat 5 sel dummy dengan aspek aktif
+    const dummyCells = Array.from({ length: 5 }, (_, i) => ({
+      i, j: i + 1, zone: 'zenith',
+      cellType : CELL_TYPE.ASPECT,
+      theta    : 60 + i,
+      aspect   : { id:'seks', name:'Sekstil', angle:60, deviation:i*0.1 },
+    }));
+
+    const result = detectAnomalyAspek(dummyCells, 5);
+    assert('T23: Anomali Aspek triggered (count=5, thresh=5)',
+      result.flag === true, `count=${result.count}`);
+  }
+
+  // T24: Anomali Aspek tidak triggered
+  {
+    const dummyCells = Array.from({ length: 4 }, (_, i) => ({
+      i, j: i + 1, zone: 'zenith',
+      cellType: CELL_TYPE.ASPECT, theta: 60,
+      aspect: { id:'seks', name:'Sekstil', angle:60, deviation:0 },
+    }));
+
+    const result = detectAnomalyAspek(dummyCells, 5);
+    assert('T24: Anomali Aspek tidak triggered (count=4, thresh=5)',
+      result.flag === false, `count=${result.count}`);
+  }
+
+  // T25: Grouping sudut identik
+  {
+    const pairs = [
+      { keyA:'SUN', keyB:'MON', theta:60.05 },
+      { keyA:'SUN', keyB:'MER', theta:60.08 },
+      { keyA:'VEN', keyB:'SAT', theta:60.03 },
+      { keyA:'JUP', keyB:'SUI', theta:60.06 },
+      { keyA:'MAR', keyB:'URA', theta:60.09 },
+    ];
+
+    const groups = groupIdenticalTheta(pairs, 0.1);
+    const total  = groups.reduce((sum, g) => sum + g.count, 0);
+    assert('T25: 5 pasangan ≈60° → 1 grup, count=5',
+      groups.length === 1 && total === 5,
+      `groups=${groups.length}, total=${total}`);
+  }
+
+  // T26: Anomali Identik triggered
+  {
+    const pairs = Array.from({ length: 5 }, (_, i) => ({
+      keyA: `A${i}`, keyB: `B${i}`,
+      theta: 120.0 + i * 0.05,   // semua dalam 0.1° dari 120.0°
+    }));
+
+    const groups = groupIdenticalTheta(pairs, 0.1);
+    const total  = groups.reduce((sum, g) => sum + g.count, 0);
+    assert('T26: Anomali Identik triggered (total=5, thresh=5)',
+      total >= 5, `total=${total}`);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.6 TEST CASES CROSS-DOME
+// ------------------------------------------------------------
+
+function runCrossDomeTests() {
+  console.log('\n── CROSS-DOME ──');
+
+  const orbCfg  = { ...DEFAULT_ORB_CONFIG, mode:'custom',
+                    custom_values:{konj:2,seks:1,kuin:1,kuad:1.5,trig:1.5,opos:2} };
+  const cdCfg   = { ...DEFAULT_CROSSDOME_CONFIG };
+
+  // T27: CZ vs CN → selalu Oposisi (θ=180°)
+  {
+    const theta = gcSep([0, 0, 1], [0, 0, -1]);
+    assert('T27: CZ-CN θ=180° Oposisi', approxEq(theta, 180),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T28: TZ vs TN → selalu Oposisi
+  {
+    const theta = gcSep([0, 0, 1], [0, 0, -1]);
+    assert('T28: TZ-TN θ=180° Oposisi', approxEq(theta, 180),
+      `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T29: Planet Zenith Alt=30° vs TN → θ=120° (Trigon)
+  {
+    const vX    = hzToVec(0, 30);    // Alt=30°, z=sin30°=0.5
+    const vTN   = [0, 0, -1];
+    const theta = gcSep(vX, vTN);
+    assert('T29: Planet Alt=30° vs TN → Trigon θ=120°',
+      approxEq(theta, 120), `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T30: Planet Zenith Alt=18° vs TN → θ=108°
+  {
+    const vX    = hzToVec(0, 18);
+    const vTN   = [0, 0, -1];
+    const theta = gcSep(vX, vTN);
+    assert('T30: Planet Alt=18° vs TN → θ=108°',
+      approxEq(theta, 108), `θ=${theta.toFixed(4)}°`);
+  }
+
+  // T31: isCrossDomePair — pasangan lintas kubah
+  {
+    const eZen = { key:'SUN', type:ENTITY_TYPE.PLANET, isAbove:true, transitional:false,
+                   vec:[0,0,1], az:0, alt:25, subLat:0, subLon:0 };
+    const eNad = { key:'SAT', type:ENTITY_TYPE.PLANET, isAbove:false, transitional:false,
+                   vec:[0,0,-1], az:0, alt:-15, subLat:0, subLon:0 };
+    assert('T31: isCrossDomePair SUN(zen)-SAT(nad)', isCrossDomePair(eZen, eNad));
+  }
+
+  // T32: isCrossDomePair — pasangan intra-dome (false)
+  {
+    const eZen1 = { key:'SUN', type:ENTITY_TYPE.PLANET, isAbove:true, transitional:false,
+                    vec:[0,0,1], az:0, alt:25, subLat:0, subLon:0 };
+    const eZen2 = { key:'MON', type:ENTITY_TYPE.PLANET, isAbove:true, transitional:false,
+                    vec:[0,0,1], az:0, alt:40, subLat:0, subLon:0 };
+    assert('T32: isCrossDomePair SUN(zen)-MON(zen) → FALSE',
+      isCrossDomePair(eZen1, eZen2) === false);
+  }
+
+  // T33: Matriks 3 ukuran dinamis
+  {
+    // Buat 15 entitas minimal: 2 Zenith, 2 Nadir, sisanya statis
+    const entities = ENTITY_KEYS.map((key, idx) => {
+      if (key === 'TZ' || key === 'CZ') {
+        return makePersonaEntity(key, -6.2, 106.8);
+      }
+      if (key === 'TN' || key === 'CN') {
+        return makePersonaEntity(key, -6.2, 106.8);
+      }
+      // Planet: alternating above/below
+      const above = idx % 2 === 0;
+      return {
+        key, type: ENTITY_TYPE.PLANET,
+        vec      : above ? [0,0,1] : [0,0,-1],
+        az       : 0, alt: above ? 25 : -15,
+        isAbove  : above, transitional: false,
+        subLat   : 0, subLon: 0,
+      };
+    });
+
+    const m3 = calcMatrix3(entities, orbCfg, cdCfg);
+    assert('T33: Matriks 3 R>0 dan C>0',
+      m3.R > 0 && m3.C > 0,
+      `R=${m3.R}, C=${m3.C}, sel=${m3.R * m3.C}`);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.7 TEST CASES ORB VALIDATION
+// ------------------------------------------------------------
+
+function runOrbValidationTests() {
+  console.log('\n── VALIDASI ORB ──');
+
+  // T34: Deteksi konflik ORB
+  {
+    const cfg = {
+      mode          : 'custom',
+      default_value : 1.0,
+      custom_values : {
+        konj: 2.0, seks: 7.0, kuin: 7.0,   // seks+kuin overlap: 7+7=14 > gap 12
+        kuad: 1.5, trig: 1.5, opos: 2.0,
+      },
+    };
+
+    const conflicts = validateOrbConflicts(cfg);
+    const hasSeksKuin = conflicts.some(
+      c => (c.aspectA === 'Sekstil' && c.aspectB === 'Kuintil') ||
+           (c.aspectA === 'Kuintil' && c.aspectB === 'Sekstil')
+    );
+    assert('T34: Konflik Sekstil-Kuintil terdeteksi (ORB 7°+7°)',
+      hasSeksKuin, `konflik: ${conflicts.map(c => `${c.aspectA}↔${c.aspectB}`).join(', ')}`);
+  }
+
+  // T35: Tidak ada konflik pada ORB default
+  {
+    const conflicts = validateOrbConflicts(DEFAULT_ORB_CONFIG);
+    assert('T35: Tidak ada konflik di default ORB', conflicts.length === 0,
+      `jumlah konflik: ${conflicts.length}`);
+  }
+}
+
+// ------------------------------------------------------------
+// 12.8 TABEL REFERENSI ALT ↔ ASPEK
+// ------------------------------------------------------------
+
+function runAltAspectTable() {
+  console.log('\n── TABEL REFERENSI Alt ↔ Aspek (TZ) ──');
+
+  const cases = [
+    { alt:  90, expectedTheta:   0, aspek: 'Konjungsi' },
+    { alt:  30, expectedTheta:  60, aspek: 'Sekstil'   },
+    { alt:  18, expectedTheta:  72, aspek: 'Kuintil'   },
+    { alt:   3, expectedTheta:  87, aspek: '—'          },
+    { alt:   0, expectedTheta:  90, aspek: 'Kuadrat'   },
+    { alt: -30, expectedTheta: 120, aspek: 'Trigon'    },
+    { alt: -90, expectedTheta: 180, aspek: 'Oposisi'   },
+  ];
+
+  const vTZ = [0, 0, 1];
+
+  for (const tc of cases) {
+    const vX    = hzToVec(0, tc.alt);
+    const theta = gcSep(vTZ, vX);
+    assert(
+      `θ(TZ, Alt=${tc.alt < 0 ? tc.alt : '+'+tc.alt}°) = ${tc.expectedTheta}° [${tc.aspek}]`,
+      approxEq(theta, tc.expectedTheta),
+      `θ_aktual=${theta.toFixed(4)}°`
+    );
+  }
+}
+
+// ------------------------------------------------------------
+// 12.9 RUNNER SEMUA TEST
+// ------------------------------------------------------------
+
+/**
+ * Menjalankan seluruh suite test DOF·ASTRO.
+ * @returns {{ passed: number, failed: number, total: number }}
+ */
+function runAllTests() {
+  testResults.length = 0;   // reset
+
+  console.log('╔════════════════════════════════════════╗');
+  console.log('║     DOF·ASTRO — TEST SUITE             ║');
+  console.log('╚════════════════════════════════════════╝');
+
+  runGeometryTests();
+  runHorizonTests();
+  runMatchingTests();
+  runAnomalyTests();
+  runCrossDomeTests();
+  runOrbValidationTests();
+  runAltAspectTable();
+
+  const passed = testResults.filter(r => r.passed).length;
+  const failed = testResults.filter(r => !r.passed).length;
+  const total  = testResults.length;
+
+  console.log('\n╔════════════════════════════════════════╗');
+  console.log(`║ HASIL: ${passed}/${total} passed, ${failed} failed`.padEnd(42) + '║');
+  console.log('╚════════════════════════════════════════╝');
+
+  if (failed > 0) {
+    console.log('\nFAILED TESTS:');
+    testResults
+      .filter(r => !r.passed)
+      .forEach(r => console.log(`  ✗ ${r.name} — ${r.detail}`));
+  }
+
+  return { passed, failed, total };
+}
+
+// Jalankan tests
+// runAllTests();
+```
+
+---
+
+## RINGKASAN MODUL
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
-║              DOF·ASTRO — RINGKASAN SISTEM REVISI             ║
+║              DOF·ASTRO — RINGKASAN PSEUDOCODE JS             ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║                                                               ║
-║  ENTITAS     : 15 total (4 Persona + 10 Planet + 1 Bintang)  ║
+║  BAB 1  KONSTANTA & CONFIG                                    ║
+║         ASTRO_CONST, ENTITY_KEYS, DEFAULT_*_CONFIG           ║
 ║                                                               ║
-║  ASPEK       : 6 utama (0°, 60°, 72°, 90°, 120°, 180°)      ║
-║                + custom tak terbatas                          ║
+║  BAB 2  ENTITAS & ZONA                                        ║
+║         makePersonaEntity()                                   ║
+║         evalHorizon()          ← H_threshold custom          ║
+║         isZenithSide()                                        ║
+║         isNadirSide()                                         ║
+║         isCrossDomePair()      ← cross-dome                  ║
 ║                                                               ║
-║  SKOR        : Tidak ada. Hanya deteksi aspek.               ║
+║  BAB 3  KATALOG ASPEK & ORB                                   ║
+║         ASPECTS_CORE[]         ← 6 aspek utama               ║
+║         addCustomAspect()                                     ║
+║         removeCustomAspect()                                  ║
+║         getAllAspects()                                        ║
+║         getOrb()                                              ║
+║         setDefaultOrb()                                       ║
+║         validateOrbConflicts()                                ║
 ║                                                               ║
-║  ORB         : Manual — Default (satu nilai)                  ║
-║                atau Custom (per-aspek)                        ║
+║  BAB 4  PIPELINE POSISI                                       ║
+║         calcJD() / calcGMST() / calcLST()                    ║
+║         eclToEq() / eqToHz() / hzToVec()                     ║
+║         calcPlanetEntity()                                    ║
+║         calcSiriusEntity()                                    ║
+║         calcAllEntities()      ← entry point 15 entitas      ║
 ║                                                               ║
-║  MATRIKS     : 15×15 = 225 sel                               ║
-║                105 sel Zenith Zone (j > i)                    ║
-║                105 sel Nadir Zone  (j < i)                    ║
-║                15 sel diagonal (hitam)                        ║
+║  BAB 5  GREAT-CIRCLE                                          ║
+║         gcSep()                ← core formula                ║
+║         isUnitVector()                                        ║
+║         thetaFromAlt()         ← shortcut TZ/TN              ║
 ║                                                               ║
-║  ANOMALI     : Per kubah (Zenith & Nadir)                    ║
-║                Tipe 1: Kepadatan aspek ≥ N_Aspek             ║
-║                Tipe 2: Sudut identik ≥ N_Identik (±0.1°)    ║
+║  BAB 6  MATCHING                                              ║
+║         matchAspect()          ← nearest-ORB                 ║
 ║                                                               ║
-║  SUDUT       : Great-Circle via Dot Product                   ║
-║                θ = arccos(clamp(v₁·v₂, -1, +1)) × (180/π)  ║
+║  BAB 7  MATRIKS 1 (INTRA-DOME 15×15)                         ║
+║         calcMatrix1()                                         ║
+║         getAspectCells()                                      ║
+║         getActiveCells()                                      ║
 ║                                                               ║
-║  ENGINE      : SwissEph WASM + Luxon + Leaflet               ║
-║                Toposentrik 3D — SEFLG_TOPOCTR                 ║
+║  BAB 8  MATRIKS 2 (θ RAW 15×15)                              ║
+║         calcMatrix2()                                         ║
+║                                                               ║
+║  BAB 9  MATRIKS 3 (CROSS-DOME R×C)                           ║
+║         calcMatrix3()          ← rectangular dinamis         ║
+║         getCrossDomeAspectCells()                             ║
+║         getCrossDomeThetaList()                               ║
+║                                                               ║
+║  BAB 10 ANOMALI                                               ║
+║         detectAnomalyAspek()                                  ║
+║         groupIdenticalTheta()                                 ║
+║         detectAnomalyIdentik()                                ║
+║         detectDomeAnomaly()    ← zenith & nadir              ║
+║         detectCrossDomeAnomaly()                              ║
+║         formatAnomalyReport()                                 ║
+║                                                               ║
+║  BAB 11 FRAME RUNNER                                          ║
+║         runFrame()             ← orkestrasi utama            ║
+║         startLiveMode()                                       ║
+║         stopLiveMode()                                        ║
+║                                                               ║
+║  BAB 12 TEST SUITE (35 test cases)                            ║
+║         runAllTests()                                         ║
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
-
----
-
-[UPDATE DOKUMENTASI]
-
-1. Batas altitude horizon bisa custom, default adalah 3 derajat. 
-2. Rancang fitur matrix cross-dome, untuk menghitung sudut entitas antar kubah.
